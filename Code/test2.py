@@ -22,72 +22,52 @@ with open("temps_collecte_Cholet_pb1_bis.pickle", "rb") as f:
 with open("weight_Cholet_pb1_bis.pickle", "rb") as f:
     weight_list = pickle.load(f)
 
-POPULATION_SIZE = 100
+POPULATION_SIZE = 1000
 WEIGHT_LIMIT = 5850
+bad = 999999
 
 def initialize_population(init_sol, population_size):
     population = [init_sol.copy() for _ in range(population_size)]
     for individual in population:
         subset = individual[1:-1]
-        random.shuffle(subset)
+        subset = mutation(subset)
         individual[1:-1] = subset
 
     return population
 
-
-def fitness(individual):
-    distance = 0
-    time = 0
-    weight = 0
-    penalty = 1000000000
-
-    for i in range(len(individual)):
-        weight += weight_list[individual[i]]
-        if weight > WEIGHT_LIMIT:
-            return 1 / penalty
-        if i != len(individual) - 1:
-            distance += dist_matrix[individual[i]][individual[i + 1]]
-            time += dur_matrix[individual[i]][individual[i + 1]]
-        time += collection_time[individual[i]]
-    return 1 / (distance + time)
+def fitness(chemin):
+    total_distance = 0
+    total_weight = 0
+    total_time = 0
+    penalty = 0
+    for i in range(1, len(chemin)):
+        total_distance += dist_matrix[chemin[i-1]][chemin[i]]
+        total_weight += weight_list[chemin[i]]
+        total_time += dur_matrix[chemin[i-1]][chemin[i]]
+        total_time += collection_time[chemin[i]]
+        if total_weight > WEIGHT_LIMIT:
+            penalty += bad
+    return total_distance + total_time + penalty
 
 def selection(population):
-    return sorted(population, key=fitness, reverse=True)[:POPULATION_SIZE // 10]
+    ranked_solutions = sorted([(fitness(s),s) for s in population], reverse=False)
+    return ranked_solutions[:POPULATION_SIZE//10]
 
-#def crossover(parent1, parent2, crossover_rate=0.7):
-#    if random.random() < crossover_rate:
-#        cp = random.randint(1, len(parent1) - 2)
-#        child1 = parent1[:cp] + parent2[cp:]
-#        child_set = set(child1)
-#        for i in range(1, len(child1) - 1):
-#            if child1.count(child1[i]) > 1:
-#                for j in range(1, len(parent2) - 1):
-#                    if parent2[j] not in child_set:
-#                        child_set.remove(child1[i])
-#                        child_set.add(parent2[j])
-#                        child1[i] = parent2[j]
-#                        break
-#        return child1
-#    else:
-#        return parent1
+def crossover(parent1, parent2):
+    start = random.randint(1, len(parent1) - 2)
+    end = random.randint(start, len(parent1) - 2)
+    new_genes = [0]
+    new_genes =  new_genes + parent1[start:end]
+    for i in range(1, len(parent2) - 1):
+        p = parent2[i]
+        if p not in new_genes:
+            new_genes.append(p)
+    new_genes.append(232)
+    return new_genes
 
-def crossover(parent1, parent2, crossover_rate=0.7):
-    if random.random() <  crossover_rate:
-        start = random.randint(1, len(parent1) - 2)
-        end = random.randint(start, len(parent1) - 2)
-        new_genes = [0]
-        new_genes =  new_genes + parent1[start:end]
-        for i in range(1, len(parent2) - 1):
-            p = parent2[i]
-            if p not in new_genes:
-                new_genes.append(p)
-        new_genes.append(232)
-        return new_genes
-    else : 
-        return random.choice([parent1, parent2])
-
-def mutation(individual, mutation_rate=0.1):
-    if random.random() < mutation_rate:
+def mutation(individual):
+    number_of_mutations = random.randint(5, 15)
+    for _ in range(number_of_mutations):
         index1, index2 = random.sample(range(1, len(individual) - 1), 2)
         individual[index1], individual[index2] = individual[index2], individual[index1]
     return individual
@@ -101,18 +81,17 @@ def genetic_algorithm(init_sol, population_size):
         new_population = []
 
         while len(new_population) < population_size:
-            parent1, parent2 = random.sample(population, 2)
-            child = crossover(parent1, parent2)
+            parent1, parent2 = population[0], population[1]   #random.sample(population, 2)
+            child = crossover(parent1[1], parent2[1])
             child = mutation(child)
             new_population.append(child)
 
         population = new_population
-        best_score= fitness(max(population, key=fitness))
+        best_score= fitness(population[0])
         generation += 1
         print(f"Generation {generation}: {best_score}")
 
-    return max(population, key=fitness)
-
+    return min(population, key=fitness)
 
 
 def calculateDandT(l):
