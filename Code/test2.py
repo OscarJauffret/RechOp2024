@@ -3,6 +3,7 @@ import pickle
 import os
 import time
 import numpy as np
+from matplotlib import pyplot as plt
 
 os.chdir("../Data/Probleme_Cholet_1_bis/")
 
@@ -40,7 +41,10 @@ def fitness(chemin):
     total_weight = 0
     total_time = 0
     penalty = 0
+    print(f"{dist_matrix  = }")
+
     for i in range(1, len(chemin)):
+        print(f"{chemin[i - 1] = }")
         total_distance += dist_matrix[chemin[i-1]][chemin[i]]
         total_weight += weight_list[chemin[i]]
         total_time += dur_matrix[chemin[i-1]][chemin[i]]
@@ -54,40 +58,51 @@ def selection(population):
     return ranked_solutions[:POPULATION_SIZE//10]
 
 def crossover(parent1, parent2):
-    start = random.randint(1, len(parent1) - 2)
-    end = random.randint(start, len(parent1) - 2)
-    new_genes = [0]
-    new_genes =  new_genes + parent1[start:end]
-    for i in range(1, len(parent2) - 1):
-        p = parent2[i]
-        if p not in new_genes:
-            new_genes.append(p)
-    new_genes.append(232)
-    return new_genes
+    child = [0]
+    for j in range(len(parent1) // 2):
+        child.append(parent1[j])
+    for element in parent2:
+        if element not in child:
+            child.append(element)
+    child.append(232)
+    return child
+
+    # start = random.randint(1, len(parent1) - 2)
+    # end = random.randint(start, len(parent1) - 2)
+    # new_genes = [0]
+    # new_genes =  new_genes + parent1[start:end]
+    # for i in range(1, len(parent2) - 1):
+    #     p = parent2[i]
+    #     if p not in new_genes:
+    #         new_genes.append(p)
+    # new_genes.append(232)
+    # return new_genes
 
 def mutation(individual):
     number_of_mutations = random.randint(5, 15)
     for _ in range(number_of_mutations):
-        index1, index2 = random.sample(range(1, len(individual) - 1), 2)
-        individual[index1], individual[index2] = individual[index2], individual[index1]
+        index = random.randint(1, len(individual) - 2)
+        individual[index], individual[index + 1] = individual[index], individual[index + 1]
     return individual
 
-def genetic_algorithm(init_sol, population_size):
+def genetic_algorithm(init_sol, population_size, best_scores):
     population = initialize_population(init_sol, population_size)
     start_time = time.time()
     generation = 0
-    while time.time() - start_time < 600:
+    while (time.time() - start_time < 600) and generation < 20:
         population = selection(population)
         new_population = []
 
         while len(new_population) < population_size:
-            parent1, parent2 = population[0], population[1]   #random.sample(population, 2)
+            parent1 = random.choice(population)
+            parent2 = random.choice(population)
             child = crossover(parent1[1], parent2[1])
             child = mutation(child)
             new_population.append(child)
 
         population = new_population
         best_score= fitness(population[0])
+        best_scores.append(best_score)
         generation += 1
         print(f"Generation {generation}: {best_score}")
 
@@ -108,7 +123,15 @@ def has_duplicates(lst):
     return len(lst) != len(set(lst))
 
 
-best_solution = genetic_algorithm(init_solu, POPULATION_SIZE)
+best_scores = []
+best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
+
+generation = [i for i in range(len(best_scores))]
+fitness = [s for s in best_scores]
+
+plt.scatter(generation, fitness)
+plt.show()
+
 print(best_solution)
 
 print(has_duplicates(best_solution))
