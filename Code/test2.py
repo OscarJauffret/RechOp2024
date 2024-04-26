@@ -7,18 +7,38 @@ from matplotlib import pyplot as plt
 
 os.chdir("../Data/Probleme_Cholet_1_bis/")
 
+## Load necessary data
+#with open("init_sol_Cholet_pb1_bis.pickle", "rb") as f:
+#    init_solu = pickle.load(f)
+#
+#with open("dist_matrix_Cholet_pb1_bis.pickle", "rb") as f:
+#    dist_matrix = pickle.load(f)
+#
+#with open("dur_matrix_Cholet_pb1_bis.pickle", "rb") as f:
+#    dur_matrix = pickle.load(f)
+#
+#with open("temps_collecte_Cholet_pb1_bis.pickle", "rb") as f:
+#    collection_time = pickle.load(f)
+
+import numpy as np
+
 # Load necessary data
 with open("init_sol_Cholet_pb1_bis.pickle", "rb") as f:
     init_solu = pickle.load(f)
+np.savetxt('init_solu.txt', np.array(init_solu), fmt='%d')
 
 with open("dist_matrix_Cholet_pb1_bis.pickle", "rb") as f:
     dist_matrix = pickle.load(f)
+np.savetxt('dist_matrix.txt', np.array(dist_matrix), fmt='%f')
 
 with open("dur_matrix_Cholet_pb1_bis.pickle", "rb") as f:
     dur_matrix = pickle.load(f)
+np.savetxt('dur_matrix.txt', np.array(dur_matrix), fmt='%f')
 
 with open("temps_collecte_Cholet_pb1_bis.pickle", "rb") as f:
     collection_time = pickle.load(f)
+np.savetxt('collection_time.txt', np.array(collection_time), fmt='%f')
+
 
 with open("weight_Cholet_pb1_bis.pickle", "rb") as f:
     weight_list = pickle.load(f)
