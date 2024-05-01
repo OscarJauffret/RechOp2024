@@ -5,6 +5,13 @@ import time
 import numpy as np
 from matplotlib import pyplot as plt
 
+ACCELERATED_MUTATION_THRESHOLD = 1000
+POPULATION_SIZE = 500
+WEIGHT_LIMIT = 5850
+bad = 999999
+ACCELERATED_MUTATION_NUMBER = 3
+OLD_GENERATION = 200
+
 os.chdir("../Data/Probleme_Cholet_1_bis/")
 
 import numpy as np
@@ -29,9 +36,6 @@ np.savetxt('collection_time.txt', np.array(collection_time), fmt='%f')
 with open("weight_Cholet_pb1_bis.pickle", "rb") as f:
     weight_list = pickle.load(f)
 
-POPULATION_SIZE = 500
-WEIGHT_LIMIT = 5850
-bad = 999999
 
 def initialize_population(init_sol, population_size):
     population = [init_sol.copy() for _ in range(population_size)]
@@ -92,34 +96,16 @@ def crossover(parent1, parent2):
 #        individual[index], individual[index + 1] = individual[index + 1], individual[index]
 #    return individual
 
-def inversion_mutation(individual):
-    start = random.randint(1, len(individual) - 2)
-    end = random.randint(start, len(individual) - 2)
+def inversion_mutation(individual, length=3):
+    start = random.randint(1, len(individual) - 2 - length)
+    #end = random.randint(start, len(individual) - 2)
+    end = start + length
     segment = individual[start:end]
     del individual[start:end]
     new_position = random.randint(1, len(individual) - 2)
     individual = individual[:new_position] + segment + individual[new_position:]
     return individual
 
-def calculate_variance(population):
-    population_np = np.array(population)
-    return np.var(population_np)
-
-def mutation(individual, generation, previous_population):
-    variance = calculate_variance(previous_population)
-    print(variance)
-    if generation % 200 == 0:
-        if variance < 5000:
-            number_of_mutations = random.randint(10, 20)
-        else:
-            number_of_mutations = random.randint(5, 15)
-    else:
-        number_of_mutations = random.randint(5, 15)
-
-    for _ in range(number_of_mutations):
-        index = random.randint(1, len(individual) - 2)
-        individual[index], individual[index + 1] = individual[index + 1], individual[index]
-    return individual
 
 def genetic_algorithm(init_sol, population_size, best_scores):
     population = initialize_population(init_sol, population_size)
@@ -130,20 +116,36 @@ def genetic_algorithm(init_sol, population_size, best_scores):
 
         best_score= population[0][0]
         best_scores.append(best_score)
+
+        #nb_of_mutations = calculate_number_of_mutations(best_scores)
+
         generation += 1
         print(f"Generation {generation}: {best_score}")
 
         new_population = []
-        
+
         while len(new_population) < population_size:
-            parent1, parent2 = tournament_selection(population), tournament_selection(population)#population[0], population[1]
+            parent1, parent2 = tournament_selection(population), tournament_selection(population)
             child = crossover(parent1[1], parent2[1])
-            child = inversion_mutation((child))
+            #for _ in range(nb_of_mutations):
+            child = inversion_mutation(child, random.randint(1, 5))
             new_population.append(child)
-        variance = calculate_variance(new_population)
+
+
+
         population = new_population
 
     return min(population, key=fitness)
+
+
+def calculate_number_of_mutations(best_scores):
+    if len(best_scores) > OLD_GENERATION and (
+            abs(best_scores[-1] - best_scores[-1 - OLD_GENERATION]) < ACCELERATED_MUTATION_THRESHOLD):
+        print("Accelerated mutation", end=" ")
+        return ACCELERATED_MUTATION_NUMBER
+    else:
+        print("Normal mutation", end=" ")
+        return 1
 
 
 def calculateDandT(l):
