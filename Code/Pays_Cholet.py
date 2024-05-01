@@ -73,7 +73,6 @@ def selection(population):
 def tournament_selection(population, tournament_size=3):
     n = len(population)
     weights = [n - i for i in range(n)]
-    #return min(random.sample(population, tournament_size), key=lambda x: x[0])
     return random.choices(population, weights=weights, k=tournament_size)[0]
 
 
@@ -86,17 +85,21 @@ def crossover(parent1, parent2):
             child.append(element)
     return child
 
-def mutation(individual):
-    number_of_mutations = random.randint(5, 15)
-    for _ in range(number_of_mutations):
-        index = random.randint(1, len(individual) - 2)
-        individual[index], individual[index + 1] = individual[index + 1], individual[index]
-    return individual
+#def mutation(individual):
+#    number_of_mutations = random.randint(5, 15)
+#    for _ in range(number_of_mutations):
+#        index = random.randint(1, len(individual) - 2)
+#        individual[index], individual[index + 1] = individual[index + 1], individual[index]
+#    return individual
 
 def inversion_mutation(individual):
     start = random.randint(1, len(individual) - 2)
     end = random.randint(start, len(individual) - 2)
-    individual[start:end] = reversed(individual[start:end])
+    #individual[start:end] = reversed(individual[start:end])
+    segment = individual[start:end]
+    del individual[start:end]
+    new_position = random.randint(1, len(individual) - 2)
+    individual = individual[:new_position] + segment + individual[new_position:]
     return individual
 
 def genetic_algorithm(init_sol, population_size, best_scores):
@@ -147,7 +150,7 @@ fitness = [s for s in best_scores]
 
 print(best_solution)
 distance, temps = calculateDandT(best_solution)
-print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} s")
+print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
 print(f"Fitness: {distance + temps}")
 print(has_duplicates(best_solution))
 
