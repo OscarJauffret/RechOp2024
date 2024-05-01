@@ -95,11 +95,30 @@ def crossover(parent1, parent2):
 def inversion_mutation(individual):
     start = random.randint(1, len(individual) - 2)
     end = random.randint(start, len(individual) - 2)
-    #individual[start:end] = reversed(individual[start:end])
     segment = individual[start:end]
     del individual[start:end]
     new_position = random.randint(1, len(individual) - 2)
     individual = individual[:new_position] + segment + individual[new_position:]
+    return individual
+
+def calculate_variance(population):
+    population_np = np.array(population)
+    return np.var(population_np)
+
+def mutation(individual, generation, previous_population):
+    variance = calculate_variance(previous_population)
+    print(variance)
+    if generation % 200 == 0:
+        if variance < 5000:
+            number_of_mutations = random.randint(10, 20)
+        else:
+            number_of_mutations = random.randint(5, 15)
+    else:
+        number_of_mutations = random.randint(5, 15)
+
+    for _ in range(number_of_mutations):
+        index = random.randint(1, len(individual) - 2)
+        individual[index], individual[index + 1] = individual[index + 1], individual[index]
     return individual
 
 def genetic_algorithm(init_sol, population_size, best_scores):
@@ -121,6 +140,7 @@ def genetic_algorithm(init_sol, population_size, best_scores):
             child = crossover(parent1[1], parent2[1])
             child = inversion_mutation((child))
             new_population.append(child)
+        variance = calculate_variance(new_population)
         population = new_population
 
     return min(population, key=fitness)
