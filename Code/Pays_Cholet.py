@@ -37,8 +37,8 @@ def initialize_population(init_sol, population_size):
     population = [init_sol.copy() for _ in range(population_size)]
     for individual in population:
         subset = individual[1:-1]
-        #random.shuffle(subset)
-        subset = mutation(subset)
+        random.shuffle(subset)
+        #subset = mutation(subset)
         individual[1:-1] = subset
 
     return population
@@ -71,7 +71,10 @@ def selection(population):
     return ranked_solutions[:POPULATION_SIZE//10]
 
 def tournament_selection(population, tournament_size=3):
-    return min(random.sample(population, tournament_size), key=lambda x: x[0])
+    n = len(population)
+    weights = [n - i for i in range(n)]
+    #return min(random.sample(population, tournament_size), key=lambda x: x[0])
+    return random.choices(population, weights=weights, k=tournament_size)[0]
 
 
 def crossover(parent1, parent2):
@@ -100,7 +103,7 @@ def genetic_algorithm(init_sol, population_size, best_scores):
     population = initialize_population(init_sol, population_size)
     start_time = time.time()
     generation = 0
-    while time.time() - start_time < 600 and generation < 500:
+    while time.time() - start_time < 600:
         population = selection(population)
 
         best_score= population[0][0]
