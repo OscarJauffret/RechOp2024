@@ -100,7 +100,7 @@ def genetic_algorithm(init_sol, population_size, best_scores):
     population = initialize_population(init_sol, population_size)
     start_time = time.time()
     generation = 0
-    while time.time() - start_time < 600:
+    while time.time() - start_time < 600 and generation < 500:
         population = selection(population)
 
         best_score= population[0][0]
