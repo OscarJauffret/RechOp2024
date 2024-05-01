@@ -50,9 +50,9 @@ def fitness(chemin):
     penalty = 0
     for i in range(len(chemin) - 1): #[0, 231]
         total_distance += dist_matrix[chemin[i]][chemin[i + 1]]
-        total_distance += dist_matrix[chemin[i]][chemin[i]]
+        #total_distance += dist_matrix[chemin[i]][chemin[i]]
 
-        total_time += dur_matrix[chemin[i]][chemin[i]]
+        #total_time += dur_matrix[chemin[i]][chemin[i]]
         total_time += dur_matrix[chemin[i]][chemin[i + 1]]
         total_time += collection_time[chemin[i]]
 
@@ -61,8 +61,8 @@ def fitness(chemin):
         if total_weight > WEIGHT_LIMIT:
             penalty += bad
             
-    total_time += dur_matrix[chemin[-1]][chemin[-1]]
-    total_distance += dist_matrix[chemin[-1]][chemin[-1]]
+    #total_time += dur_matrix[chemin[-1]][chemin[-1]]
+    #total_distance += dist_matrix[chemin[-1]][chemin[-1]]
     total_time += collection_time[chemin[-1]]
     return total_distance + total_time + penalty
 
@@ -127,8 +127,8 @@ def calculateDandT(l):
         if i != len(l) - 1:
             distance += dist_matrix[l[i]][l[i + 1]]
             time += dur_matrix[l[i]][l[i + 1]]
-        distance += dist_matrix[l[i]][l[i]]    
-        time += dur_matrix[l[i]][l[i]]
+        #distance += dist_matrix[l[i]][l[i]]    
+        #time += dur_matrix[l[i]][l[i]]
         time += collection_time[l[i]]
     return distance , time 
 
@@ -142,16 +142,16 @@ best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
 generation = [i for i in range(len(best_scores))]
 fitness = [s for s in best_scores]
 
-plt.scatter(generation, fitness)
-plt.show()
-
 print(best_solution)
 distance, temps = calculateDandT(best_solution)
-print(f"Distance: {distance} km, Temps: {temps} h")
+print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} s")
 print(f"Fitness: {distance + temps}")
 print(has_duplicates(best_solution))
 
 
 distance, temps= calculateDandT(init_solu)
-print(f"Distance: {distance} , Temps: {temps/3600} ")
+print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
 print(f"fitness sol initiale : {distance + temps}")
+
+plt.scatter(generation, fitness)
+plt.show()
