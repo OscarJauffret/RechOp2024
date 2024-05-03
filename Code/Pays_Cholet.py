@@ -73,7 +73,7 @@ def selection(population):
 def tournament_selection(population, tournament_size=3):
     n = len(population)
     weights = [n - i for i in range(n)]
-    return random.choices(population, weights=weights, k=tournament_size)[0]
+    return min(random.choices(population, weights=weights, k=tournament_size))
 
 
 def crossover(parent1, parent2):
