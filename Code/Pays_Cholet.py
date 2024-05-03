@@ -54,19 +54,15 @@ def fitness(chemin):
     penalty = 0
     for i in range(len(chemin) - 1): #[0, 231]
         total_distance += dist_matrix[chemin[i]][chemin[i + 1]]
-        #total_distance += dist_matrix[chemin[i]][chemin[i]]
 
-        #total_time += dur_matrix[chemin[i]][chemin[i]]
         total_time += dur_matrix[chemin[i]][chemin[i + 1]]
         total_time += collection_time[chemin[i]]
 
         total_weight += weight_list[chemin[i]]
-
+        total_weight = max(total_weight, 0)
         if total_weight > WEIGHT_LIMIT:
             penalty += bad
             
-    #total_time += dur_matrix[chemin[-1]][chemin[-1]]
-    #total_distance += dist_matrix[chemin[-1]][chemin[-1]]
     total_time += collection_time[chemin[-1]]
     return total_distance + total_time + penalty
 
@@ -164,22 +160,28 @@ def has_duplicates(lst):
     return len(lst) != len(set(lst))
 
 
-best_scores = []
-best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
+#best_scores = []
+#best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
+#
+#generation = [i for i in range(len(best_scores))]
+#fitness = [s for s in best_scores]
+#
+#print(best_solution)
+#distance, temps = calculateDandT(best_solution)
+#print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+#print(f"Fitness: {distance + temps}")
+#print(has_duplicates(best_solution))
+#
+#
+#distance, temps= calculateDandT(init_solu)
+#print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+#print(f"fitness sol initiale : {distance + temps}")
+#
+#plt.scatter(generation, fitness)
+#plt.show()
 
-generation = [i for i in range(len(best_scores))]
-fitness = [s for s in best_scores]
-
-print(best_solution)
-distance, temps = calculateDandT(best_solution)
-print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-print(f"Fitness: {distance + temps}")
-print(has_duplicates(best_solution))
-
-
-distance, temps= calculateDandT(init_solu)
-print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-print(f"fitness sol initiale : {distance + temps}")
-
-plt.scatter(generation, fitness)
-plt.show()
+array = list(range(0, 233))
+subset = array[1:-1]
+random.shuffle(subset)
+array[1:-1] = subset
+score = fitness(array)
