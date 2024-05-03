@@ -68,13 +68,29 @@ def fitness(chemin):
     return total_distance + total_time + penalty
 
 def selection(population):
-    ranked_solutions = sorted([(fitness(s),s) for s in population], reverse=False)
+    ranked_solutions = sorted([(fitness(s), s) for s in population], reverse=False)
     return ranked_solutions[:POPULATION_SIZE//10]
 
-def tournament_selection(population, tournament_size=3):
+def calculateVariance(population):
+    mean = sum(sol[0] for sol in population) / len(population)
+    return sum((sol[0] - mean) ** 2 for sol in population) / len(population)
+
+def calculate_base(variance):
+    """ Calcule une base de décroissance dynamique en fonction de la variance. """
+    if variance > 230000:
+        return 0.3 + (500000 - variance) / 1000000  # Exemple de formule adaptative
+    else:
+        return 1.03  # Base plus stable pour des variances faibles
+
+def tournament_selection(population, variance, tournament_size=3):
     n = len(population)
     #weights = [n - i for i in range(n)]
-    weights = [pow(1.05, -i) for i in range(n)]
+    #base = calculate_base(variance)
+    #weights = [math.exp(-base * i) for i in range(n)]
+    if variance > 230000:
+        weights = [math.exp(-0.4 * i) for i in range(n)]
+    else:
+        weights = [pow(1.05, -i) for i in range(n)]
     return min(random.choices(population, weights=weights, k=tournament_size))
 
 
@@ -98,7 +114,7 @@ def mutation(individual, length=3):
     return individual
 
 
-def genetic_algorithm(init_sol, population_size, best_scores):
+def genetic_algorithm(init_sol, population_size, best_scores, variances):
     population = initialize_population(init_sol, population_size)
     start_time = time.time()
     generation = 0
@@ -111,10 +127,14 @@ def genetic_algorithm(init_sol, population_size, best_scores):
         generation += 1
         print(f"Generation {generation}: {best_score}")
 
+        population_variance = calculateVariance(population)
+        #print(f"Variance: {population_variance}")
+        #variances.append(population_variance)
+
         new_population = []
 
         while len(new_population) < population_size:
-            parent1, parent2 = tournament_selection(population), tournament_selection(population)
+            parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population, population_variance)
             #child1, child2 = crossover(parent1[0], parent1[1], parent2[0], parent2[1])
             child = crossover(parent1[1],parent2[1])
             #child1, child2 = inversion_mutation(child1, random.randint(1, 5)), inversion_mutation(child2, random.randint(1, 5))
@@ -143,7 +163,8 @@ def has_duplicates(lst):
 
 
 best_scores = []
-best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
+variances = []
+best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
 
 generation = [i for i in range(len(best_scores))]
 fitness = [s for s in best_scores]
@@ -161,6 +182,12 @@ print(f"fitness sol initiale : {distance + temps}")
 
 plt.scatter(generation, fitness)
 plt.show()
+
+#generation = [i for i in range(len(best_scores))]
+#variance = [s for s in variances]
+#
+#plt.scatter(generation, variance)
+#plt.show()
 
 
 #def calculate_mass(parent):
