@@ -78,19 +78,19 @@ def calculateVariance(population):
 def calculate_base(variance):
     """ Calcule une base de décroissance dynamique en fonction de la variance. """
     if variance > 230000:
-        return 0.3 + (500000 - variance) / 1000000  # Exemple de formule adaptative
+        return 0.3 + (variance / 1000000)  # Exemple de formule adaptative
     else:
-        return 1.03  # Base plus stable pour des variances faibles
+        return 1.05  # Base plus stable pour des variances faibles
 
 def tournament_selection(population, variance, tournament_size=3):
     n = len(population)
     #weights = [n - i for i in range(n)]
-    #base = calculate_base(variance)
-    #weights = [math.exp(-base * i) for i in range(n)]
-    if variance > 230000:
-        weights = [math.exp(-0.4 * i) for i in range(n)]
-    else:
-        weights = [pow(1.05, -i) for i in range(n)]
+    base = calculate_base(variance)
+    weights = [math.exp(-base * i) for i in range(n)]
+    #if variance > 230000:
+    #    weights = [math.exp(-0.4 * i) for i in range(n)]
+    #else:
+    #    weights = [pow(1.05, -i) for i in range(n)]
     return min(random.choices(population, weights=weights, k=tournament_size))
 
 
@@ -125,10 +125,10 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
         best_scores.append(best_score)
 
         generation += 1
-        print(f"Generation {generation}: {best_score}")
+        print(f"Generation {generation}: {best_score}", end=" ")
 
         population_variance = calculateVariance(population)
-        #print(f"Variance: {population_variance}")
+        print(f"Variance: {population_variance}")
         #variances.append(population_variance)
 
         new_population = []
