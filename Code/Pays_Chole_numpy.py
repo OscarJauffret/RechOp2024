@@ -68,55 +68,24 @@ def tournament_selection(population, tournament_size=3):
     return population[selected_indices[np.argmin(selected_fitness_values)]]
 
 
-#def crossover(parent1, parent2):
-#    parent1, parent2  = np.array(parent1), np.array(parent2)
-#    child = np.zeros_like(parent1)
-#    child[:len(parent1)//2] = parent1[:len(parent1)//2]
-#    not_in_child = ~np.isin(parent2, child)
-#    child[len(parent1)//2:] = parent2[not_in_child]
-#    return child#.tolist()
 def crossover(parent1, parent2):
-    child = [0]
-    child = np.array(child)
-    for j in range(1, len(parent1) // 2):
-        child.append(parent1[j])
-    for element in parent2:
-        if element not in child:
-            child.append(element)
-    return child
+    parent1, parent2  = np.array(parent1), np.array(parent2)
+    child = np.zeros_like(parent1)
+    child[:len(parent1)//2] = parent1[:len(parent1)//2]
+    not_in_child = ~np.isin(parent2, child)
+    child[len(parent1)//2:] = parent2[not_in_child]
+    return child#.tolist()
 
 def mutation(individual, length=3):
     start = np.random.randint(1, len(individual) - 2 - length)
     end = start + length
     segment = individual[start:end]
-    individual = np.delete(individual, segment)
+    individual = np.delete(individual, np.arange(start, end))
     new_position = np.random.randint(1, len(individual) - 2)
     individual = np.insert(individual, new_position, segment)
     return individual
 
-#def genetic_algorithm(init_sol, population_size, best_scores):
-#    population = initialize_population(init_sol, population_size)
-#    start_time = time.time()
-#    generation = 0
-#    while time.time() - start_time < 600:
-#        population = selection(population)
-#
-#        best_score= fitness(population[0])
-#        best_scores.append(best_score)
-#
-#        generation += 1
-#        print(f"Generation {generation}: {best_score}")
-#
-#        new_population = []
-#        new_population = np.array(new_population)
-#
-#        while len(new_population) < population_size:
-#            parent1, parent2 = tournament_selection(population), tournament_selection(population)
-#            child = crossover(parent1, parent2)
-#            child = mutation(child, random.randint(1, 5))
-#            new_population.append(child.tolist())
-#
-#    return new_population
+
 def genetic_algorithm(init_sol, population_size):
     population = initialize_population(init_sol, population_size)
     best_scores = []
@@ -139,5 +108,7 @@ def genetic_algorithm(init_sol, population_size):
 
     return min(population, key=fitness), best_scores
 
+def has_duplicates(array):
+    return len(array) != len(np.unique(array))
 
 best, best_scores  = genetic_algorithm(init_solu, POPULATION_SIZE)

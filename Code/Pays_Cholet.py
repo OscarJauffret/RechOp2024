@@ -160,28 +160,22 @@ def has_duplicates(lst):
     return len(lst) != len(set(lst))
 
 
-#best_scores = []
-#best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
-#
-#generation = [i for i in range(len(best_scores))]
-#fitness = [s for s in best_scores]
-#
-#print(best_solution)
-#distance, temps = calculateDandT(best_solution)
-#print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-#print(f"Fitness: {distance + temps}")
-#print(has_duplicates(best_solution))
-#
-#
-#distance, temps= calculateDandT(init_solu)
-#print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-#print(f"fitness sol initiale : {distance + temps}")
-#
-#plt.scatter(generation, fitness)
-#plt.show()
+best_scores = []
+best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
 
-array = list(range(0, 233))
-subset = array[1:-1]
-random.shuffle(subset)
-array[1:-1] = subset
-score = fitness(array)
+generation = [i for i in range(len(best_scores))]
+fitness = [s for s in best_scores]
+
+print(best_solution)
+distance, temps = calculateDandT(best_solution)
+print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+print(f"Fitness: {distance + temps}")
+print(has_duplicates(best_solution))
+
+
+distance, temps= calculateDandT(init_solu)
+print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+print(f"fitness sol initiale : {distance + temps}")
+
+plt.scatter(generation, fitness)
+plt.show()
