@@ -75,18 +75,16 @@ def calculateVariance(population):
     mean = sum(sol[0] for sol in population) / len(population)
     return sum((sol[0] - mean) ** 2 for sol in population) / len(population)
 
-def calculate_base(variance):
-    """ Calcule une base de décroissance dynamique en fonction de la variance. """
-    if variance > 230000:
-        return 0.3 + (variance / 1000000)  # Exemple de formule adaptative
-    else:
-        return 1.05  # Base plus stable pour des variances faibles
+def exponential_base(variance, a=0.01, b=1, c=1, d=0.0002):
+    base = a * np.log(b + variance) + c + d * (np.log(b + variance))**3
+    return base
 
 def tournament_selection(population, variance, tournament_size=3):
     n = len(population)
     #weights = [n - i for i in range(n)]
-    base = calculate_base(variance)
+    base = exponential_base(variance)
     weights = [math.exp(-base * i) for i in range(n)]
+    weights[1:] = [w*2 for w in weights[1:]]
     #if variance > 230000:
     #    weights = [math.exp(-0.4 * i) for i in range(n)]
     #else:
@@ -168,6 +166,8 @@ best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, varia
 
 generation = [i for i in range(len(best_scores))]
 fitness = [s for s in best_scores]
+
+print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
 
 print(best_solution)
 distance, temps = calculateDandT(best_solution)
