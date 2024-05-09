@@ -86,7 +86,7 @@ def exponential_base(variance, a=0.01, b=1, c=1, d=0.0002):
 #         return 1.05 * np.exp(-variance / 230000)
     
     
-def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.001, max_base=1.01):
+def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.0005, max_base=1.01):
     if variance <= min_variance:
         return max_base     # Grande base pour favoriser l'exploitation
     elif variance >= max_variance:
@@ -105,7 +105,13 @@ def tournament_selection(population, variance, tournament_size=10):
     #    weights = [math.exp(-0.4 * i) for i in range(n)]
     #else:
     #    weights = [pow(1.05, -i) for i in range(n)]
-    return min(random.choices(population, weights=weights, k=tournament_size))
+    tournament = random.choices(population, weights=weights, k=tournament_size)
+    tournament = sorted(tournament, key=lambda x: x[0])
+
+    p = 0.9
+    tournament_weights = [p * ((1 - p) ** i) for i in range(tournament_size)]
+    return random.choices(tournament, weights=tournament_weights, k=1)[0]
+    #return min(random.choices(population, weights=weights, k=tournament_size))
 
 
 def crossover(parent1, parent2):
@@ -128,7 +134,7 @@ def mutation(individual, length=3):
     return individual
 
 
-def genetic_algorithm(init_sol, population_size, best_scores, variances):
+def genetic_algorithm(init_sol, population_size, best_scores, variances, carried_over_proportion=0.2):
     population = initialize_population(init_sol, population_size)
     start_time = time.time()
     generation = 0
@@ -147,7 +153,7 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
 
         new_population = []
 
-        new_population.extend(individual[1] for individual in population[:population_size//4])
+        new_population.extend(individual[1] for individual in population[:int(round(len(population) * carried_over_proportion, 0))])
 
         while len(new_population) < population_size//2:
             parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population, population_variance)
