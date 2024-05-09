@@ -5,6 +5,9 @@ import time
 import numpy as np
 from matplotlib import pyplot as plt
 import math
+import itertools
+
+
 
 ACCELERATED_MUTATION_THRESHOLD = 1000
 POPULATION_SIZE = 500
@@ -15,11 +18,10 @@ OLD_GENERATION = 200
 
 os.chdir("../Data/Probleme_Cholet_1_bis/")
 
-import numpy as np
-
 # Load necessary data
 with open("init_sol_Cholet_pb1_bis.pickle", "rb") as f:
     init_solu = pickle.load(f)
+
 np.savetxt('init_solu.txt', np.array(init_solu), fmt='%d')
 
 with open("dist_matrix_Cholet_pb1_bis.pickle", "rb") as f:
@@ -53,17 +55,14 @@ def fitness(chemin):
     total_weight = 0
     total_time = 0
     penalty = 0
-    for i in range(len(chemin) - 1): #[0, 231]
-        total_distance += dist_matrix[chemin[i]][chemin[i + 1]]
-
-        total_time += dur_matrix[chemin[i]][chemin[i + 1]]
-        total_time += collection_time[chemin[i]]
-
-        total_weight += weight_list[chemin[i]]
+    for i, j in itertools.islice(zip(chemin, chemin[1:]), len(chemin) - 1):
+        total_distance += dist_matrix[i][j]
+        total_time += dur_matrix[i][j]
+        total_time += collection_time[i]
+        total_weight += weight_list[i]
         total_weight = max(total_weight, 0)
         if total_weight > WEIGHT_LIMIT:
             penalty += bad
-            
     total_time += collection_time[chemin[-1]]
     return total_distance + total_time + penalty
 
@@ -105,22 +104,19 @@ def tournament_selection(population, variance, tournament_size=10):
     #    weights = [math.exp(-0.4 * i) for i in range(n)]
     #else:
     #    weights = [pow(1.05, -i) for i in range(n)]
-    tournament = random.choices(population, weights=weights, k=tournament_size)
-    tournament = sorted(tournament, key=lambda x: x[0])
-
-    p = 0.9
-    tournament_weights = [p * ((1 - p) ** i) for i in range(tournament_size)]
-    return random.choices(tournament, weights=tournament_weights, k=1)[0]
-    #return min(random.choices(population, weights=weights, k=tournament_size))
+    return min(random.choices(population, weights=weights, k=tournament_size))
 
 
-def crossover(parent1, parent2):
+def crossover(parent1: list[int], parent2: list[int]) -> list[int]:
     child = [0]
+    child_set = set(child)  # Create a set to track elements in child
     for j in range(1, len(parent1) // 2):
         child.append(parent1[j])
+        child_set.add(parent1[j])  # Add new element to set
     for element in parent2:
-        if element not in child:
+        if element not in child_set:  # Check set for membership
             child.append(element)
+            child_set.add(element)  # Add new element to set
     return child
 
 
@@ -141,7 +137,7 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, carried
     while time.time() - start_time < 600:
         population = selection(population)
 
-        best_score= population[0][0]
+        best_score = population[0][0]
         best_scores.append(best_score)
 
         generation += 1
@@ -158,7 +154,7 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, carried
         while len(new_population) < population_size//2:
             parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population, population_variance)
             #child1, child2 = crossover(parent1[0], parent1[1], parent2[0], parent2[1])
-            child = crossover(parent1[1],parent2[1])
+            child = crossover(parent1[1], parent2[1])
             #child1, child2 = inversion_mutation(child1, random.randint(1, 5)), inversion_mutation(child2, random.randint(1, 5))
             child = mutation(child, random.randint(1, 5))
             new_population.append(child)
@@ -212,59 +208,3 @@ print(f"fitness sol initiale : {distance + temps}")
 
 plt.scatter(generation, fitness)
 plt.show()
-
-#generation = [i for i in range(len(best_scores))]
-#variance = [s for s in variances]
-#
-#plt.scatter(generation, variance)
-#plt.show()
-
-
-#def calculate_mass(parent):
-#    mass = []
-#    for i in range(len(parent)):
-#        left_neighbor = parent[i - 1] if i > 0 else -1
-#        right_neighbor = parent[i + 1] if i < len(parent) - 1 else -1
-#        if left_neighbor == -1 :
-#            
-#        mass.append(dist_matrix[parent[i]][left_neighbor] + dist_matrix[parent[i]][right_neighbor])
-#    return mass
-#
-#def calculate_velocity(parent):
-#    return sum(dist_matrix[parent[i]][parent[i + 1]] for i in range(len(parent) - 1)) / len(parent)
-#
-#def collision(m1, m2, v1, v2):
-#    v1_prime = ((m1 - m2) / (m1 + m2)) * v1 + ((2 * m2) / (m1 + m2)) * v2
-#    v2_prime = ((2 * m1) / (m1 + m2)) * v1 - ((m1 - m2) / (m1 + m2)) * v2
-#    return v1_prime, v2_prime
-#
-#def crossover(fitness1,parent1, fitness2, parent2):
-#    offspring1 = parent1.copy()
-#    offspring2 = parent2.copy()
-#
-#    #total_velocity1 = calculate_velocity(parent1)
-#    #total_velocity2 = calculate_velocity(parent2)
-#    for i in range(len(parent1)):
-#        mass1 = 0
-#        mass2 = 0
-#        left_neighbor1 = parent1[i - 1] if i > 0 else -1
-#        right_neighbor1 = parent1[i + 1] if i < len(parent1) - 1 else -1
-#        if left_neighbor1 != -1:
-#            mass1 += dist_matrix[parent1[i]][left_neighbor1]
-#        if right_neighbor1 != -1:
-#            mass1 += dist_matrix[parent1[i]][right_neighbor1]
-#
-#        left_neighbor2 = parent2[i - 1] if i > 0 else -1
-#        right_neighbor2 = parent2[i + 1] if i < len(parent2) - 1 else -1
-#        if left_neighbor2 != -1:
-#            mass2 += dist_matrix[parent2[i]][left_neighbor2]
-#        if right_neighbor2 != -1:
-#            mass2 += dist_matrix[parent2[i]][right_neighbor2]
-#
-#        v1_prime, v2_prime = collision(mass1, mass2, fitness1, fitness2)#total_velocity1, total_velocity2)
-#        if v1_prime <= 0:
-#            offspring1[i] = parent2[i]
-#        if v2_prime <= 0:
-#            offspring2[i] = parent1[i]
-#
-#    return offspring1, offspring2
