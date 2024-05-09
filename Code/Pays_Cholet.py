@@ -79,18 +79,18 @@ def exponential_base(variance, a=0.01, b=1, c=1, d=0.0002):
     base = a * np.log(b + variance) + c + d * (np.log(b + variance))**3
     return base
 
-def calculate_base(variance):
-    if variance > 230000:
-        return 0.3 + (variance / 1000000)
-    else:
-        return 1.05 * np.exp(-variance / 230000)
+# def calculate_base(variance):
+#     if variance > 230000:
+#         return 0.3 + (variance / 1000000)
+#     else:
+#         return 1.05 * np.exp(-variance / 230000)
     
     
 def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.001, max_base=1.01):
     if variance <= min_variance:
-        return max_base
+        return max_base     # Grande base pour favoriser l'exploitation
     elif variance >= max_variance:
-        return min_base
+        return min_base     # Petite base pour favoriser l'exploration
     else:
         return max_base + (min_base - max_base) * ((variance - min_variance) / (max_variance - min_variance))   
 
@@ -147,7 +147,9 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
 
         new_population = []
 
-        while len(new_population) < population_size:
+        new_population.extend(individual[1] for individual in population[:population_size//4])
+
+        while len(new_population) < population_size//2:
             parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population, population_variance)
             #child1, child2 = crossover(parent1[0], parent1[1], parent2[0], parent2[1])
             child = crossover(parent1[1],parent2[1])
@@ -155,6 +157,12 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
             child = mutation(child, random.randint(1, 5))
             new_population.append(child)
             #new_population.append(child2)
+
+        while len(new_population) < population_size:
+            parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population, population_variance)
+            child = crossover(parent1[1], parent2[1])
+            child = mutation(child, random.randint(10, 15))
+            new_population.append(child)
 
         population = new_population
 
