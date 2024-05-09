@@ -86,7 +86,7 @@ def exponential_base(variance, a=0.01, b=1, c=1, d=0.0002):
 #         return 1.05 * np.exp(-variance / 230000)
     
     
-def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.001, max_base=1.01):
+def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.0005, max_base=1.01):
     if variance <= min_variance:
         return max_base     # Grande base pour favoriser l'exploitation
     elif variance >= max_variance:
