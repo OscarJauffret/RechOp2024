@@ -30,15 +30,8 @@ import math
 import numpy as np
 
 def exponential_base(variance, a=0.01, b=1, c=1, d=0.0002):
-    base = a * np.log(b + variance) + c + d * (np.log(b + variance))**3
+    base = a * np.log(b + variance) + c - d * (np.log(b + variance))**3
     return base
-
-def exponential_base2(variance, a=0.01, b=1):
-    base = a * (b + variance)**0.5
-    return base
-
-
-
 
 n = 233  # Taille de la liste
 base = 0.4  # Base de l'exponentielle, moins de 1 pour des poids décroissants
@@ -51,20 +44,16 @@ weights2 = [math.exp(-base * i) for i in range(n)]
 base = 1.18
 weights3 = [math.exp(-base * i) for i in range(n)]
 
-print(weights1)
-print(weights2)
-print(weights3)
+#print(weights1)
+#print(weights2)
+#print(weights3)
+
 
 variances = [1, 100, 10000, 200000, 1000000, 100000000]
 bases = [exponential_base(var) for var in variances]
 print(bases)
 for base in bases:
-    print([math.exp(-base * i) for i in range(n)])
-
-bases = [exponential_base2(var) for var in variances]
-print(bases)
-for base in bases:
-    print([math.exp(-base * i) for i in range(n)])
+    print([math.exp(-base * i) for i in range(233)])
 
 
 

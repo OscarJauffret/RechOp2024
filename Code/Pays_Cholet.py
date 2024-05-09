@@ -79,12 +79,28 @@ def exponential_base(variance, a=0.01, b=1, c=1, d=0.0002):
     base = a * np.log(b + variance) + c + d * (np.log(b + variance))**3
     return base
 
-def tournament_selection(population, variance, tournament_size=3):
+def calculate_base(variance):
+    if variance > 230000:
+        return 0.3 + (variance / 1000000)
+    else:
+        return 1.05 * np.exp(-variance / 230000)
+    
+    
+def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.001, max_base=1.01):
+    if variance <= min_variance:
+        return max_base
+    elif variance >= max_variance:
+        return min_base
+    else:
+        return max_base + (min_base - max_base) * ((variance - min_variance) / (max_variance - min_variance))   
+
+
+def tournament_selection(population, variance, tournament_size=10):
     n = len(population)
     #weights = [n - i for i in range(n)]
-    base = exponential_base(variance)
+    base = linear_base(variance)#exponential_base(variance)
     weights = [math.exp(-base * i) for i in range(n)]
-    weights[1:] = [w*2 for w in weights[1:]]
+    #weights[1:] = [w*2 for w in weights[1:]]
     #if variance > 230000:
     #    weights = [math.exp(-0.4 * i) for i in range(n)]
     #else:
