@@ -75,15 +75,6 @@ def calculateVariance(population):
     mean = sum(sol[0] for sol in population) / len(population)
     return sum((sol[0] - mean) ** 2 for sol in population) / len(population)
 
-def exponential_base(variance, a=0.01, b=1, c=1, d=0.0002):
-    base = a * np.log(b + variance) + c + d * (np.log(b + variance))**3
-    return base
-
-# def calculate_base(variance):
-#     if variance > 230000:
-#         return 0.3 + (variance / 1000000)
-#     else:
-#         return 1.05 * np.exp(-variance / 230000)
     
     
 def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.0005, max_base=1.01):
@@ -97,14 +88,9 @@ def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.
 
 def tournament_selection(population, variance, tournament_size=10):
     n = len(population)
-    #weights = [n - i for i in range(n)]
     base = linear_base(variance)#exponential_base(variance)
     weights = [math.exp(-base * i) for i in range(n)]
-    #weights[1:] = [w*2 for w in weights[1:]]
-    #if variance > 230000:
-    #    weights = [math.exp(-0.4 * i) for i in range(n)]
-    #else:
-    #    weights = [pow(1.05, -i) for i in range(n)]
+
     return min(random.choices(population, weights=weights, k=tournament_size))
 
 
