@@ -41,9 +41,12 @@ with open("weight_Cholet_pb1_bis.pickle", "rb") as f:
 
 def initialize_population(init_sol, population_size):
     population = [init_sol.copy() for _ in range(population_size)]
-    print(f"Génération 0: Solution initiale: {fitness(init_sol)}")
-    for individual in population[1:]:
-        individual = mutation(individual, random.randint(1, 5))
+    print(f"Génération 0: Solution initiale: {fitness(init_sol)} {init_sol}")
+    for i, individual in enumerate(population[1:]):
+        if i < population_size // 2:
+            individual = mutation(individual.copy(), random.randint(1, 5))
+        else:
+            individual = mutation(individual.copy(), random.randint(10, 15))
 
     return population
 
@@ -77,19 +80,7 @@ def calculateVariance(population):
     return sum((sol[0] - mean) ** 2 for sol in population) / len(population)
 
 
-def exponential_base(variance, a=0.01, b=1, c=1, d=0.0002):
-    base = a * np.log(b + variance) + c + d * (np.log(b + variance)) ** 3
-    return base
-
-
-# def calculate_base(variance):
-#     if variance > 230000:
-#         return 0.3 + (variance / 1000000)
-#     else:
-#         return 1.05 * np.exp(-variance / 230000)
-
-
-def linear_base(variance, min_variance=10000, max_variance=25000, min_base=0.001, max_base=1.01):
+def linear_base(variance, min_variance=10000, max_variance=25000, min_base=0.0005, max_base=1.01):
     if variance <= min_variance:
         return max_base  # Grande base pour favoriser l'exploitation
     elif variance >= max_variance:
@@ -140,6 +131,9 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
     generation = 0
     while time.time() - start_time < 600:
         population = selection(population)
+        if generation == 0:
+            print(population[0][1])
+
 
         best_score = population[0][0]
         best_scores.append(best_score)
