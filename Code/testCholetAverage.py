@@ -5,6 +5,7 @@ import time
 import numpy as np
 from matplotlib import pyplot as plt
 import math
+import itertools
 
 ACCELERATED_MUTATION_THRESHOLD = 1000
 POPULATION_SIZE = 500
@@ -15,7 +16,6 @@ OLD_GENERATION = 200
 
 os.chdir("../Data/Probleme_Cholet_1_bis/")
 
-import numpy as np
 
 # Load necessary data
 with open("init_sol_Cholet_pb1_bis.pickle", "rb") as f:
@@ -53,13 +53,11 @@ def fitness(chemin):
     total_weight = 0
     total_time = 0
     penalty = 0
-    for i in range(len(chemin) - 1): #[0, 231]
-        total_distance += dist_matrix[chemin[i]][chemin[i + 1]]
-
-        total_time += dur_matrix[chemin[i]][chemin[i + 1]]
-        total_time += collection_time[chemin[i]]
-
-        total_weight += weight_list[chemin[i]]
+    for i, j in itertools.islice(zip(chemin, chemin[1:]), len(chemin) - 1):
+        total_distance += dist_matrix[i][j]
+        total_time += dur_matrix[i][j]
+        total_time += collection_time[i]
+        total_weight += weight_list[i]
         total_weight = max(total_weight, 0)
         if total_weight > WEIGHT_LIMIT:
             penalty += bad
@@ -75,17 +73,7 @@ def calculateVariance(population):
     mean = sum(sol[0] for sol in population) / len(population)
     return sum((sol[0] - mean) ** 2 for sol in population) / len(population)
 
-def exponential_base(variance, a=0.01, b=1, c=1, d=0.0002):
-    base = a * np.log(b + variance) + c + d * (np.log(b + variance))**3
-    return base
 
-# def calculate_base(variance):
-#     if variance > 230000:
-#         return 0.3 + (variance / 1000000)
-#     else:
-#         return 1.05 * np.exp(-variance / 230000)
-    
-    
 def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.0005, max_base=1.01):
     if variance <= min_variance:
         return max_base     # Grande base pour favoriser l'exploitation
@@ -97,24 +85,22 @@ def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.
 
 def tournament_selection(population, variance, tournament_size=10):
     n = len(population)
-    #weights = [n - i for i in range(n)]
     base = linear_base(variance)#exponential_base(variance)
     weights = [math.exp(-base * i) for i in range(n)]
-    #weights[1:] = [w*2 for w in weights[1:]]
-    #if variance > 230000:
-    #    weights = [math.exp(-0.4 * i) for i in range(n)]
-    #else:
-    #    weights = [pow(1.05, -i) for i in range(n)]
+
     return min(random.choices(population, weights=weights, k=tournament_size))
 
 
-def crossover(parent1, parent2):
+def crossover(parent1: list[int], parent2: list[int]) -> list[int]:
     child = [0]
+    child_set = set(child)  # Create a set to track elements in child
     for j in range(1, len(parent1) // 2):
         child.append(parent1[j])
+        child_set.add(parent1[j])  # Add new element to set
     for element in parent2:
-        if element not in child:
+        if element not in child_set:  # Check set for membership
             child.append(element)
+            child_set.add(element)  # Add new element to set
     return child
 
 
@@ -136,6 +122,7 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
         population = selection(population)
 
         best_score= population[0][0]
+        best_score = population[0][0]
         best_scores.append(best_score)
 
         generation += 1
@@ -192,8 +179,8 @@ best_scores = []
 variances = []
 best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
 
-generation = [i for i in range(len(best_scores))]
-fitness = [s for s in best_scores]
+#generation = [i for i in range(len(best_scores))]
+#fitness = [s for s in best_scores]
 
 #print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
 #print(f"en {len(generation)} générations")
