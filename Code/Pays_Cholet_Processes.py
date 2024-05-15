@@ -1,3 +1,4 @@
+import itertools
 import multiprocessing
 import random
 import pickle
@@ -6,7 +7,6 @@ import time
 import numpy as np
 from matplotlib import pyplot as plt
 import math
-import itertools
 
 ACCELERATED_MUTATION_THRESHOLD = 1000
 POPULATION_SIZE = 1000
@@ -14,7 +14,7 @@ WEIGHT_LIMIT = 5850
 bad = 999999
 ACCELERATED_MUTATION_NUMBER = 3
 OLD_GENERATION = 200
-NUMBER_OF_PROCESSES = 4
+MUTATION_RATE = 0.2
 
 os.chdir("../Data/Probleme_Cholet_1_bis/")
 
@@ -22,122 +22,87 @@ os.chdir("../Data/Probleme_Cholet_1_bis/")
 with open("init_sol_Cholet_pb1_bis.pickle", "rb") as f:
     init_solu = pickle.load(f)
 
-np.savetxt('init_solu.txt', np.array(init_solu), fmt='%d')
-
 with open("dist_matrix_Cholet_pb1_bis.pickle", "rb") as f:
     dist_matrix = pickle.load(f)
-np.savetxt('dist_matrix.txt', np.array(dist_matrix), fmt='%f')
 
 with open("dur_matrix_Cholet_pb1_bis.pickle", "rb") as f:
     dur_matrix = pickle.load(f)
-np.savetxt('dur_matrix.txt', np.array(dur_matrix), fmt='%f')
 
 with open("temps_collecte_Cholet_pb1_bis.pickle", "rb") as f:
     collection_time = pickle.load(f)
-np.savetxt('collection_time.txt', np.array(collection_time), fmt='%f')
 
 with open("weight_Cholet_pb1_bis.pickle", "rb") as f:
     weight_list = pickle.load(f)
 
+def get_optimal_processes(utilization_ratio=3):
+    num_cores = os.cpu_count()
+    print(f"Number of cores: {num_cores}")
+    num_processes = int(num_cores * utilization_ratio)
+    return max(1, num_processes)
 
 def initialize_population(init_sol, population_size):
     population = [init_sol.copy() for _ in range(population_size)]
-    for individual in population:
-        subset = individual[1:-1]
-        random.shuffle(subset)
-        # subset = mutation(subset)
-        individual[1:-1] = subset
-
+    print(f"Génération 0: Solution initiale: {fitness(init_sol)} {init_sol}")
+    for i in range(1, population_size):
+        population[i] = mutation(population[i].copy(), random.randint(1, 5))
     return population
 
 
-def fitness(chemin):
+def fitness(chemin) -> float:
     total_distance = 0
     total_weight = 0
-    total_time = 0
     penalty = 0
+    max_distance = 0
+    index_max_distance = 0
     for i, j in itertools.islice(zip(chemin, chemin[1:]), len(chemin) - 1):
+        if dist_matrix[i][j] > max_distance:
+            max_distance = dist_matrix[i][j]
+            index_max_distance = j
         total_distance += dist_matrix[i][j]
-        # total_time += dur_matrix[i][j]
-        # total_time += collection_time[i]
         total_weight += weight_list[i]
         total_weight = max(total_weight, 0)
         if total_weight > WEIGHT_LIMIT:
             penalty += bad
-    # total_time += collection_time[chemin[-1]]
-    return total_distance + total_time + penalty
-
-def fitness_worker(sub_population):
-    return [fitness(sol) for sol in sub_population]
+    return (total_distance + penalty, index_max_distance)
 
 
-def parallel_fitness(population):
-    pool = multiprocessing.Pool(NUMBER_OF_PROCESSES)
-    # Diviser la population en sous-populations pour chaque processus
-    sub_populations = [population[i::NUMBER_OF_PROCESSES] for i in range(NUMBER_OF_PROCESSES)]
-    # Calculer la fitness de chaque sous-population en parallèle
-    fitness_values = pool.map(fitness_worker, sub_populations)
-    pool.close()
-    pool.join()
-    # Fusionner les résultats
-    return [item for sublist in fitness_values for item in sublist]
-
-
-def selection(population):
-    fitness_values = parallel_fitness(population)
+def selection(population, pool):
+    fitness_values = pool.map(fitness, population)
     ranked_solutions = sorted(zip(fitness_values, population), reverse=False)
     return ranked_solutions[:POPULATION_SIZE // 4]
 
 
 def calculateVariance(population):
-    mean = sum(sol[0] for sol in population) / len(population)
-    return sum((sol[0] - mean) ** 2 for sol in population) / len(population)
+    mean = sum(sol[0][0] for sol in population) / len(population)
+    return sum((sol[0][0] - mean) ** 2 for sol in population) / len(population)
 
 
-def exponential_base(variance, a=0.01, b=1, c=1, d=0.0002):
-    base = a * np.log(b + variance) + c + d * (np.log(b + variance)) ** 3
-    return base
-
-
-# def calculate_base(variance):
-#     if variance > 230000:
-#         return 0.3 + (variance / 1000000)
-#     else:
-#         return 1.05 * np.exp(-variance / 230000)
-
-
-def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.0005, max_base=1.01):
+def linear_base(variance, min_variance=100000, max_variance=2500000, min_base=0.0005, max_base=1.01):
     if variance <= min_variance:
-        return max_base  # Grande base pour favoriser l'exploitation
+        return min_base
     elif variance >= max_variance:
-        return min_base  # Petite base pour favoriser l'exploration
+        return max_base
     else:
         return max_base + (min_base - max_base) * ((variance - min_variance) / (max_variance - min_variance))
 
 
-def tournament_selection(population, variance, tournament_size=25):
+def tournament_selection(population, variance, tournament_size=10):
     n = len(population)
-    # weights = [n - i for i in range(n)]
-    base = linear_base(variance)  # exponential_base(variance)
+    base = linear_base(variance)
     weights = [math.exp(-base * i) for i in range(n)]
-    # weights[1:] = [w*2 for w in weights[1:]]
-    # if variance > 230000:
-    #    weights = [math.exp(-0.4 * i) for i in range(n)]
-    # else:
-    #    weights = [pow(1.05, -i) for i in range(n)]
     return min(random.choices(population, weights=weights, k=tournament_size))
 
 
-def crossover(parent1: list[int], parent2: list[int]) -> list[int]:
+def crossover(parent1: list[int], parent2: list[int], p1cp, p2cp) -> list[int]:
     child = [0]
-    child_set = set(child)  # Create a set to track elements in child
+    child_set = set(child)
     for j in range(1, len(parent1) // 2):
         child.append(parent1[j])
-        child_set.add(parent1[j])  # Add new element to set
+        child_set.add(parent1[j])
     for element in parent2:
-        if element not in child_set:  # Check set for membership
+        if element not in child_set:
             child.append(element)
-            child_set.add(element)  # Add new element to set
+            child_set.add(element)
     return child
 
 
@@ -151,46 +116,54 @@ def mutation(individual, length=3):
     return individual
 
 
-def genetic_algorithm(init_sol, population_size, best_scores, variances, carried_over_proportion=0.2):
+def genetic_algorithm(init_sol, population_size, best_scores, variances, n_processes):
     population = initialize_population(init_sol, population_size)
     start_time = time.time()
     generation = 0
-    while time.time() - start_time < 600:
-        population = selection(population)
+    stuck_generations = 0
+    previous_score = 0
+    with multiprocessing.Pool() as pool:
+        while time.time() - start_time < 600:
+            population = selection(population, pool)
+            if generation == 0:
+                print(population[0][1])
 
-        best_score = population[0][0]
-        best_scores.append(best_score)
+            best_score = population[0][0][0]
+            best_scores.append(best_score)
 
-        generation += 1
-        print(f"Generation {generation}: {best_score}", end=" ")
+            if best_score == previous_score:
+                stuck_generations += 1
+            else:
+                stuck_generations = 0
+                previous_score = best_score
 
-        population_variance = calculateVariance(population)
-        print(f"Variance: {population_variance}")
-        # variances.append(population_variance)
+            generation += 1
+            print(f"Generation {generation}: {best_score}", end=" ")
 
-        new_population = []
+            population_variance = calculateVariance(population)
+            print(f"Variance: {population_variance}")
+            variances.append(population_variance)
 
-        new_population.extend(
-            individual[1] for individual in population[:int(round(len(population) * carried_over_proportion, 0))])
+            new_population = []
+            new_population.extend(individual[1] for individual in population[:population_size // 50])
 
-        while len(new_population) < population_size // 2:
-            parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population,
-                                                                                                           population_variance)
-            # child1, child2 = crossover(parent1[0], parent1[1], parent2[0], parent2[1])
-            child = crossover(parent1[1], parent2[1])
-            # child1, child2 = inversion_mutation(child1, random.randint(1, 5)), inversion_mutation(child2, random.randint(1, 5))
-            child = mutation(child, random.randint(1, 5))
-            new_population.append(child)
-            # new_population.append(child2)
+            while len(new_population) < population_size // 2:
+                parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(
+                    population, population_variance)
+                child = crossover(parent1[1], parent2[1], parent1[0][1], parent2[0][1])
+                mutation_length = random.randint(2, 6) if stuck_generations > 10 else random.randint(1, 3)
+                child = mutation(child, mutation_length)
+                new_population.append(child)
 
-        while len(new_population) < population_size:
-            parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population,
-                                                                                                           population_variance)
-            child = crossover(parent1[1], parent2[1])
-            child = mutation(child, random.randint(10, 15))
-            new_population.append(child)
+            while len(new_population) < population_size:
+                parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(
+                    population, population_variance)
+                child = crossover(parent1[1], parent2[1], parent1[0][1], parent2[0][1])
+                mutation_length = random.randint(6, 18) if stuck_generations > 10 else random.randint(3, 9)
+                child = mutation(child, mutation_length)
+                new_population.append(child)
 
-        population = new_population
+            population = new_population
 
     return min(population, key=fitness)
 
@@ -198,7 +171,7 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, carried
 def calculateDandT(l):
     distance = 0
     time = 0
-    for i in range(len(l)):  # [0, 232]
+    for i in range(len(l)):
         if i != len(l) - 1:
             distance += dist_matrix[l[i]][l[i + 1]]
             time += dur_matrix[l[i]][l[i + 1]]
@@ -210,24 +183,26 @@ def has_duplicates(lst):
     return len(lst) != len(set(lst))
 
 
-best_scores = []
-variances = []
-best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
+if __name__ == "__main__":
+    best_scores = []
+    variances = []
+    N_PROCESSES = get_optimal_processes()
+    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances, N_PROCESSES)
 
-generation = [i for i in range(len(best_scores))]
-fitness = [s for s in best_scores]
+    generation = [i for i in range(len(best_scores))]
+    fitness = [s for s in best_scores]
 
-print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
+    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
 
-print(best_solution)
-distance, temps = calculateDandT(best_solution)
-print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-print(f"Fitness: {distance + temps}")
-print(has_duplicates(best_solution))
+    print(best_solution)
+    distance, temps = calculateDandT(best_solution)
+    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+    print(f"Fitness: {distance + temps}")
+    print(has_duplicates(best_solution))
 
-distance, temps = calculateDandT(init_solu)
-print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-print(f"fitness sol initiale : {distance + temps}")
+    distance, temps = calculateDandT(init_solu)
+    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+    print(f"fitness sol initiale : {distance + temps}")
 
-plt.scatter(generation, fitness)
-plt.show()
+    plt.scatter(generation, fitness)
+    plt.show()
