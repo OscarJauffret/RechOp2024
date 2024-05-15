@@ -3,7 +3,7 @@ import concurrent.futures
 
 def run_script():
     # Exécute le script et retourne la sortie
-    result = subprocess.run(['python', 'Pays_Cholet.py'], capture_output=True, text=True)
+    result = subprocess.run(['python', 'Pays_Cholet_age.py'], capture_output=True, text=True)
     return float(result.stdout.strip())
 
 def main():
