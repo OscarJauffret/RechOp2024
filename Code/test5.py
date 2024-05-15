@@ -14,7 +14,7 @@ WEIGHT_LIMIT = 5850
 bad = 999999
 ACCELERATED_MUTATION_NUMBER = 3
 OLD_GENERATION = 200
-MUTATION_RATE = 1
+MUTATION_RATE = 0.8
 try:
     os.chdir("../Data/Probleme_Cholet_1_bis/")
 except FileNotFoundError:
@@ -96,16 +96,34 @@ def tournament_selection(population, variance, tournament_size=10):
     return min(random.choices(population, weights=weights, k=tournament_size))
 
 
-def crossover(parent1: list[int], parent2: list[int], p1cp, p2cp) -> list[int]:
+def crossover(parent1: list[int], parent2: list[int], p1cp: int, p2cp:  int) -> list[int]:
+    # Définir les segments en coupant les parents sur leurs pires gènes
+    if p1cp < p2cp:
+        segment1 = parent1[1:p1cp]
+        segment2 = parent2[p1cp:p2cp]
+        segment3 = parent1[p2cp:]
+    else:
+        segment1 = parent2[1:p2cp]
+        segment2 = parent1[p2cp:p1cp]
+        segment3 = parent2[p1cp:]
+
+    # Initialiser l'enfant avec le premier élément commun
     child = [0]
     child_set = set(child)
-    for j in range(1, len(parent1) // 2):
-        child.append(parent1[j])
-        child_set.add(parent1[j])
-    for element in parent2:
-        if element not in child_set:
-            child.append(element)
-            child_set.add(element)
+
+    # Ajouter les segments à l'enfant tout en évitant les doublons
+    for segment in [segment1, segment2, segment3]:
+        for gene in segment:
+            if gene not in child_set:
+                child.append(gene)
+                child_set.add(gene)
+
+    # Ajouter les éléments restants des parents pour compléter l'enfant
+    for parent in [parent1, parent2]:
+        for gene in parent:
+            if gene not in child_set:
+                child.append(gene)
+                child_set.add(gene)
     return child
 
 
@@ -113,8 +131,8 @@ def mutation(individual, length=3):
     start = random.randint(1, len(individual) - 2 - length)
     end = start + length
     segment = individual[start:end]
-    if random.random() < 0.5:
-        segment = segment[::-1]
+    #if random.random() < 0.5:
+    #    segment = segment[::-1]
     del individual[start:end]
     new_position = random.randint(1, len(individual) - 2)
     individual = individual[:new_position] + segment + individual[new_position:]
@@ -125,24 +143,6 @@ def swap_mutation(individual):
     individual[i], individual[j] = individual[j], individual[i]
     return individual
 
-
-def three_opt_mutation(individual):
-    i, j, k = random.sample(range(1, len(individual) - 1), 3)
-    i, j, k = sorted([i, j, k])
-    A = individual[1:i]
-    B = individual[i:j]
-    C = individual[j:k]
-    D = individual[k:-1]
-    segments = [A, B, C, D]
-
-    for perm in itertools.permutations(segments):
-        new_individual = [0]
-        for segment in perm:
-            new_individual.extend(segment)
-        new_individual.append(232)
-        if fitness(new_individual)[0] < fitness(individual)[0]:
-            return new_individual
-    return mutation(individual)
 
 def genetic_algorithm(init_sol, population_size, best_scores, variances, n_processes):
     population = initialize_population(init_sol, population_size)
@@ -172,7 +172,6 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, n_proce
 
             new_population = []
             new_population.extend(individual[1] for individual in population[:population_size // 50])
-
             while len(new_population) < population_size // 2:
                 parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(
                     population, population_variance)
@@ -180,10 +179,7 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, n_proce
                 mutation_length = random.randint(2, 6) if stuck_generations > 10 else random.randint(1, 3)
                 if random.random() < MUTATION_RATE:
                     #if rand := random.randint(1, 3) == 1:
-                    if stuck_generations > 300:
-                        child = three_opt_mutation(child)
-                    else:
-                        child = mutation(child, mutation_length)
+                    child = mutation(child, mutation_length)
                     #child = three_opt_mutation(child)
                     #elif rand == 2:
                 #child = mutation(child, mutation_length)
@@ -196,10 +192,7 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, n_proce
                 mutation_length = random.randint(6, 18) if stuck_generations > 10 else random.randint(3, 9)
                 if random.random() < MUTATION_RATE:
                     #if rand := random.randint(1, 3) == 1:
-                    if stuck_generations > 300:
-                        child = three_opt_mutation(child)
-                    else:
-                        child = mutation(child, mutation_length)
+                    child = mutation(child, mutation_length)
                     #child = three_opt_mutation(child)
                     #elif rand == 2:
                     #child = swap_mutation(child)
@@ -225,7 +218,7 @@ def has_duplicates(lst):
     return len(lst) != len(set(lst))
 
 def ispermutation(l):
-    return sorted(l) == list(range(233))
+    return sorted(l) == list(range(233)) and l[0] == 0 and l[-1] == 232
 
 
 if __name__ == "__main__":
