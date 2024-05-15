@@ -14,7 +14,7 @@ WEIGHT_LIMIT = 5850
 bad = 999999
 ACCELERATED_MUTATION_NUMBER = 3
 OLD_GENERATION = 200
-MUTATION_RATE = 0.8
+MUTATION_RATE = 0.9
 try:
     os.chdir("../Data/Probleme_Cholet_1_bis/")
 except FileNotFoundError:
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
     print(f"Fitness: {distance + temps}")
     print(has_duplicates(best_solution))
-    print(ispermutation(best_solution))
+    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
 
     distance, temps = calculateDandT(init_solu)
     print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
