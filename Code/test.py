@@ -120,3 +120,6 @@ def ispermutation(l):
     return sorted(l) == range(233)
 
 print(ispermutation(notresol2))
+
+print([math.exp(-1.01 * i) for i in range(233)])
+print([math.exp(-0.0005 * i) for i in range(233)])

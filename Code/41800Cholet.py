@@ -35,6 +35,8 @@ with open("temps_collecte_Cholet_pb1_bis.pickle", "rb") as f:
 with open("weight_Cholet_pb1_bis.pickle", "rb") as f:
     weight_list = pickle.load(f)
 
+# init_solu (notre meilleure actuelle) = [0, 80, 81, 82, 83, 84, 210, 85, 86, 87, 88, 78, 89, 90, 212, 219, 213, 214, 216, 204, 211, 155, 109, 77, 160, 112, 152, 151, 226, 148, 200, 9, 145, 51, 52, 53, 65, 55, 56, 139, 57, 138, 129, 20, 137, 60, 61, 120, 222, 42, 175, 96, 5, 93, 121, 128, 127, 189, 15, 94, 23, 25, 26, 27, 28, 24, 126, 125, 124, 123, 95, 103, 104, 105, 34, 132, 131, 130, 35, 36, 37, 38, 39, 106, 136, 135, 134, 107, 16, 40, 122, 133, 17, 18, 19, 108, 169, 172, 168, 167, 43, 44, 45, 46, 47, 48, 49, 166, 165, 164, 147, 4, 12, 68, 191, 146, 187, 69, 163, 221, 229, 29, 1, 2, 199, 116, 67, 186, 10, 11, 117, 158, 118, 159, 144, 143, 41, 13, 14, 142, 227, 195, 62, 63, 54, 194, 196, 197, 6, 7, 8, 218, 198, 119, 193, 176, 64, 70, 58, 59, 185, 141, 192, 140, 50, 21, 22, 31, 202, 32, 33, 71, 72, 66, 207, 97, 224, 113, 76, 156, 209, 217, 215, 231, 114, 149, 173, 201, 174, 188, 73, 150, 190, 30, 181, 3, 208, 220, 110, 92, 157, 111, 180, 179, 171, 228, 170, 161, 183, 182, 91, 206, 230, 162, 177, 178, 100, 101, 184, 115, 79, 98, 99, 203, 154, 153, 102, 74, 205, 75, 225, 223, 232]
+
 def get_optimal_processes(utilization_ratio=3):
     num_cores = os.cpu_count()
     print(f"Number of cores: {num_cores}")
@@ -47,7 +49,6 @@ def initialize_population(init_sol, population_size):
     for _ in range(1, population_size):
         new_individual = mutation(init_sol.copy(), random.randint(1, 5))
         population.append(new_individual)
-    print(len(population))
     return population
 
 
@@ -80,11 +81,12 @@ def calculateVariance(population):
     return sum((sol[0][0] - mean) ** 2 for sol in population) / len(population)
 
 
-def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.0005, max_base=1.01):
+# NB : le 41.8km a été obtenu en utilisant max_variance = 1_000_000 et min_variance = 100_000
+def linear_base(variance, min_variance=100000, max_variance=200000, min_base=0.0005, max_base=1.01):
     if variance <= min_variance:
-        return min_base
+        return min_base     # Petite base pour favoriser l'exploration
     elif variance >= max_variance:
-        return max_base
+        return max_base     # Grande base pour favoriser l'exploitation, donc on donne plus de poids aux meilleures solutions
     else:
         return max_base + (min_base - max_base) * ((variance - min_variance) / (max_variance - min_variance))
 
