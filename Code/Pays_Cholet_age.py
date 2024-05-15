@@ -12,7 +12,7 @@ POPULATION_SIZE = 500
 WEIGHT_LIMIT = 5850
 bad = 999999
 ACCELERATED_MUTATION_NUMBER = 3
-OLD_GENERATION = 50
+OLD_GENERATION = 15
 
 os.chdir("../Data/Probleme_Cholet_1_bis/")
 
@@ -89,14 +89,9 @@ def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.
 
 def tournament_selection(population, variance, tournament_size=10) -> tuple[float, int, list[int]]:
     n = len(population)
-    # weights = [n - i for i in range(n)]
     base = linear_base(variance)  # exponential_base(variance)
     weights = [math.exp(-base * i) for i in range(n)]
-    # weights[1:] = [w*2 for w in weights[1:]]
-    # if variance > 230000:
-    #    weights = [math.exp(-0.4 * i) for i in range(n)]
-    # else:
-    #    weights = [pow(1.05, -i) for i in range(n)]
+
     return min(random.choices(population, weights=weights, k=tournament_size))
 
 
@@ -135,10 +130,10 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, carried
         best_scores.append(best_score)
 
         generation += 1
-        print(f"Generation {generation}: {best_score[0]}, age {population[0][1]}", end=" ")
+        #print(f"Generation {generation}: {best_score[0]}, age {population[0][1]}", end=" ")
 
         population_variance = calculateVariance(population)
-        print(f"Variance: {population_variance}")
+        #print(f"Variance: {population_variance}")
         # variances.append(population_variance)
 
         new_population = []
@@ -184,22 +179,22 @@ best_scores = []
 variances = []
 best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
 
-generation = [i for i in range(len(best_scores))]
-fitness = [s[0] for s in best_scores]
+#generation = [i for i in range(len(best_scores))]
+#fitness = [s[0] for s in best_scores]
 
-print(f"La meilleure solutions jamais obtenue est : {min(best_scores)[0]}")
+#print(f"La meilleure solutions jamais obtenue est : {min(best_scores)[0]}")
 
-print(best_solution[1])
+#print(best_solution[1])
 distance, temps = calculateDandT(best_solution[1])
-print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-print(f"Fitness: {distance + temps}")
-print(has_duplicates(best_solution[1]))
+#print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+print(distance + temps)
+#print(has_duplicates(best_solution[1]))
 
-distance, temps = calculateDandT(init_solu)
-print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-print(f"fitness sol initiale : {distance + temps}")
-
-print(f"Age moyen des meilleures solutions : {sum([s[1] for s in best_scores]) / len(best_scores)}")
-
-plt.scatter(generation, fitness)
-plt.show()
+#distance, temps = calculateDandT(init_solu)
+#print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+#print(f"fitness sol initiale : {distance + temps}")
+#
+#print(f"Age moyen des meilleures solutions : {sum([s[1] for s in best_scores]) / len(best_scores)}")
+#
+#plt.scatter(generation, fitness)
+#plt.show()

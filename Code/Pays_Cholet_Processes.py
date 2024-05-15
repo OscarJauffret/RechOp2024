@@ -16,7 +16,11 @@ ACCELERATED_MUTATION_NUMBER = 3
 OLD_GENERATION = 200
 MUTATION_RATE = 0.2
 
-os.chdir("../Data/Probleme_Cholet_1_bis/")
+
+try:
+    os.chdir("../Data/Probleme_Cholet_1_bis/")
+except FileNotFoundError:
+    pass
 
 # Load necessary data
 with open("init_sol_Cholet_pb1_bis.pickle", "rb") as f:
@@ -34,11 +38,6 @@ with open("temps_collecte_Cholet_pb1_bis.pickle", "rb") as f:
 with open("weight_Cholet_pb1_bis.pickle", "rb") as f:
     weight_list = pickle.load(f)
 
-def get_optimal_processes(utilization_ratio=3):
-    num_cores = os.cpu_count()
-    print(f"Number of cores: {num_cores}")
-    num_processes = int(num_cores * utilization_ratio)
-    return max(1, num_processes)
 
 def initialize_population(init_sol, population_size):
     population = [init_sol.copy() for _ in range(population_size)]
@@ -116,7 +115,7 @@ def mutation(individual, length=3):
     return individual
 
 
-def genetic_algorithm(init_sol, population_size, best_scores, variances, n_processes):
+def genetic_algorithm(init_sol, population_size, best_scores, variances):
     population = initialize_population(init_sol, population_size)
     start_time = time.time()
     generation = 0
@@ -129,12 +128,13 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, n_proce
                 print(population[0][1])
 
             best_score = population[0][0][0]
-            best_scores.append(best_score)
+            best_scores.append((best_score,population[0][1]))
 
             if best_score == previous_score:
                 stuck_generations += 1
             else:
                 stuck_generations = 0
+                print("Je me reset")
                 previous_score = best_score
 
             generation += 1
@@ -145,13 +145,22 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, n_proce
             variances.append(population_variance)
 
             new_population = []
-            new_population.extend(individual[1] for individual in population[:population_size // 50])
+            if stuck_generations >= 400:
+                print("MASACREEEEEEEEEEEE")
+                population=population[50:]
+                new_population.extend(individual[1] for individual in population) 
+            elif stuck_generations >= 50: 
+                new_population.extend(individual[1] for individual in population[:population_size // 50]) 
+
+
+            #if generation < 2000:
+            #    new_population.extend(individual[1] for individual in population[:population_size // 50])
 
             while len(new_population) < population_size // 2:
-                parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(
-                    population, population_variance)
+                parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population, population_variance)
                 child = crossover(parent1[1], parent2[1], parent1[0][1], parent2[0][1])
-                mutation_length = random.randint(2, 6) if stuck_generations > 10 else random.randint(1, 3)
+                #mutation_length = random.randint(20, 50) if stuck_generations > 400 else random.randint(2,6)
+                mutation_length = random.randint(2,6) if stuck_generations > 10 else random.randint(1,3)
                 child = mutation(child, mutation_length)
                 new_population.append(child)
 
@@ -159,6 +168,7 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, n_proce
                 parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(
                     population, population_variance)
                 child = crossover(parent1[1], parent2[1], parent1[0][1], parent2[0][1])
+                #mutation_length = random.randint(60, 90) if stuck_generations > 400 else random.randint(6, 18)
                 mutation_length = random.randint(6, 18) if stuck_generations > 10 else random.randint(3, 9)
                 child = mutation(child, mutation_length)
                 new_population.append(child)
@@ -186,13 +196,12 @@ def has_duplicates(lst):
 if __name__ == "__main__":
     best_scores = []
     variances = []
-    N_PROCESSES = get_optimal_processes()
-    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances, N_PROCESSES)
+    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
 
     generation = [i for i in range(len(best_scores))]
-    fitness = [s for s in best_scores]
+    fitness = [s[0] for s in best_scores]
 
-    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
+    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)[0]}, avec ce chemin : {min(best_scores)[1]}")
 
     print(best_solution)
     distance, temps = calculateDandT(best_solution)
