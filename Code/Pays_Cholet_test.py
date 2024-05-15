@@ -12,7 +12,7 @@ POPULATION_SIZE = 500
 WEIGHT_LIMIT = 5850
 bad = 999999
 ACCELERATED_MUTATION_NUMBER = 3
-OLD_GENERATION = 50
+OLD_GENERATION = 70
 
 os.chdir("../Data/Probleme_Cholet_1_bis/")
 
@@ -40,8 +40,11 @@ with open("weight_Cholet_pb1_bis.pickle", "rb") as f:
 
 def initialize_population(init_sol, population_size) -> list[tuple[int, list[int]]]:
     population = [(0, init_sol.copy()) for _ in range(population_size)]
-    for age, individual in population[1:]:
-        individual = mutation(individual.copy(), random.randint(1, 5))
+    for i, individual in enumerate(population[1:]):
+        if i < population_size // 2:
+            population[i] = (individual[0], mutation(init_sol.copy(), random.randint(1, 5)))
+        else:
+            population[i] = (individual[0], mutation(init_sol.copy(), random.randint(10, 15)))
 
     return population
 
@@ -53,21 +56,22 @@ def fitness(chemin, age) -> float:
     penalty = 0
     for i, j in itertools.islice(zip(chemin, chemin[1:]), len(chemin) - 1):
         total_distance += dist_matrix[i][j]
-        total_time += dur_matrix[i][j]
-        total_time += collection_time[i]
+        #total_time += dur_matrix[i][j]
+        #total_time += collection_time[i]
         total_weight += weight_list[i]
         total_weight = max(total_weight, 0)
         if total_weight > WEIGHT_LIMIT:
             penalty += bad
-    total_time += collection_time[chemin[-1]]
-    #if age > OLD_GENERATION:
-    #    return (total_distance + total_time + penalty) * (1 + 0.01 * age)
+    #total_time += collection_time[chemin[-1]]
+    if age > OLD_GENERATION:
+        return (total_distance + total_time + penalty) * (1 + 0.005 * age)
     return total_distance + total_time + penalty
 
 
 def selection(population: list[tuple[int, list[int]]]) -> list[tuple[float, int, list[int]]]:
     ranked_solutions = sorted([(fitness(s[1], s[0]), s[0] + 1, s[1]) for s in population], reverse=False, key=lambda x: x[0])
-    return ranked_solutions[:POPULATION_SIZE // 10]
+    selected_proportion = POPULATION_SIZE // random.randint(10, 20)
+    return ranked_solutions[:selected_proportion]
 
 
 def calculateVariance(population) -> float:
@@ -89,6 +93,9 @@ def tournament_selection(population, variance, tournament_size=10) -> tuple[floa
     # weights = [n - i for i in range(n)]
     base = linear_base(variance)  # exponential_base(variance)
     weights = [math.exp(-base * i) for i in range(n)]
+    for i, weight in enumerate(weights):
+        if population[i][1] > OLD_GENERATION:
+            weights[i] = 0
     # weights[1:] = [w*2 for w in weights[1:]]
     # if variance > 230000:
     #    weights = [math.exp(-0.4 * i) for i in range(n)]
@@ -114,6 +121,8 @@ def mutation(individual, length=3):
     start = random.randint(1, len(individual) - 2 - length)
     end = start + length
     segment = individual[start:end]
+    if random.random() < 0.5:
+        segment = segment[::-1]
     del individual[start:end]
     new_position = random.randint(1, len(individual) - 2)
     individual = individual[:new_position] + segment + individual[new_position:]
@@ -125,8 +134,6 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, carried
     start_time = time.time()
     generation = 0
     while time.time() - start_time < 600:
-        carried_over_proportion = 0.4 + (0.6 * ((time.time() - start_time) / 600))
-        print(f"Carried over proportion: {carried_over_proportion}", end=" ")
         population: list[tuple[float, int, list[int]]] = selection(population)
         # population = [(fitness, age, individu), ...]
 
@@ -152,14 +159,16 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, carried
             parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population,
                                                                                                            population_variance)
             child = crossover(parent1[2], parent2[2])
-            child = mutation(child, random.randint(1, random.randint(1, 5)))
+            if random.random() < 0.5:
+                child = mutation(child, random.randint(1, 5))
             new_population.append((0, child))
 
         while len(new_population) < population_size:
             parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population,
                                                                                                            population_variance)
             child = crossover(parent1[2], parent2[2])
-            child = mutation(child, random.randint(10, 15))  # Slightly increase mutation for diversity
+            if random.random() < 0.5:
+                child = mutation(child, random.randint(5, 7))  # Slightly increase mutation for diversity
             new_population.append((0, child))
 
         population = new_population

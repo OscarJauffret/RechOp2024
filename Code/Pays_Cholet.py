@@ -180,7 +180,8 @@ def calculateDandT(l):
             distance += dist_matrix[l[i]][l[i + 1]]
             time += dur_matrix[l[i]][l[i + 1]]
         time += collection_time[l[i]]
-    return distance , time 
+    return distance, time
+
 
 def has_duplicates(lst):
     return len(lst) != len(set(lst))

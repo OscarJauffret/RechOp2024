@@ -40,11 +40,12 @@ with open("weight_Cholet_pb1_bis.pickle", "rb") as f:
 
 def initialize_population(init_sol, population_size):
     population = [init_sol.copy() for _ in range(population_size)]
-    for individual in population:
-        subset = individual[1:-1]
-        random.shuffle(subset)
-        #subset = mutation(subset)
-        individual[1:-1] = subset
+    for i, individual in enumerate(population[1:]):
+        if i < population_size // 2:
+            population[i] = mutation(init_sol.copy(), random.randint(1, 5))
+        else:
+            for _ in range(2):
+                population[i] = mutation(population[i], random.randint(10, 15))
 
     return population
 
@@ -55,14 +56,14 @@ def fitness(chemin):
     penalty = 0
     for i, j in itertools.islice(zip(chemin, chemin[1:]), len(chemin) - 1):
         total_distance += dist_matrix[i][j]
-        total_time += dur_matrix[i][j]
-        total_time += collection_time[i]
+        #total_time += dur_matrix[i][j]
+        #total_time += collection_time[i]
         total_weight += weight_list[i]
         total_weight = max(total_weight, 0)
         if total_weight > WEIGHT_LIMIT:
             penalty += bad
             
-    total_time += collection_time[chemin[-1]]
+    #total_time += collection_time[chemin[-1]]
     return total_distance + total_time + penalty
 
 def selection(population):
@@ -108,6 +109,8 @@ def mutation(individual, length=3):
     start = random.randint(1, len(individual) - 2 - length)
     end = start + length
     segment = individual[start:end]
+    if random.random() < 0.5:
+        segment = segment[::-1]
     del individual[start:end]
     new_position = random.randint(1, len(individual) - 2)
     individual = individual[:new_position] + segment + individual[new_position:]
@@ -121,38 +124,34 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
     while time.time() - start_time < 600:
         population = selection(population)
 
-        best_score= population[0][0]
+        best_score = population[0][0]
         best_score = population[0][0]
         best_scores.append(best_score)
 
         generation += 1
 
         population_variance = calculateVariance(population)
-        
-        #variances.append(population_variance)
 
         #if generation%500 == 0 or generation == 1:
-        #    print(f"Generation {generation}: {best_score}", end=" ")
-        #    print(f"Variance: {population_variance}")
+        # print(f"Generation {generation}: {best_score}", end=" ")
+        # print(f"Variance: {population_variance}")
             
 
         new_population = []
 
-        new_population.extend(individual[1] for individual in population[:population_size//4])
+        #new_population.extend(individual[1] for individual in population[:population_size//4])
+        new_population.append(population[0][1])
 
         while len(new_population) < population_size//2:
             parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population, population_variance)
-            #child1, child2 = crossover(parent1[0], parent1[1], parent2[0], parent2[1])
             child = crossover(parent1[1],parent2[1])
-            #child1, child2 = inversion_mutation(child1, random.randint(1, 5)), inversion_mutation(child2, random.randint(1, 5))
             child = mutation(child, random.randint(1, 5))
             new_population.append(child)
-            #new_population.append(child2)
 
         while len(new_population) < population_size:
             parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population, population_variance)
             child = crossover(parent1[1], parent2[1])
-            child = mutation(child, random.randint(10, 15))
+            child = mutation(child, random.randint(7, 10))
             new_population.append(child)
 
         population = new_population
@@ -188,7 +187,7 @@ best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, varia
 #print(best_solution)
 distance, temps = calculateDandT(best_solution)
 #print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-print(distance + temps)
+print(f"{distance + temps}, {distance}, {best_solution}")
 #print(has_duplicates(best_solution))
 
 

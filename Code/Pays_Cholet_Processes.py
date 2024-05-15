@@ -1,4 +1,4 @@
-import itertools
+import multiprocessing
 import random
 import pickle
 import os
@@ -6,21 +6,22 @@ import time
 import numpy as np
 from matplotlib import pyplot as plt
 import math
+import itertools
 
 ACCELERATED_MUTATION_THRESHOLD = 1000
-POPULATION_SIZE = 500
+POPULATION_SIZE = 1000
 WEIGHT_LIMIT = 5850
 bad = 999999
 ACCELERATED_MUTATION_NUMBER = 3
 OLD_GENERATION = 200
+NUMBER_OF_PROCESSES = 4
 
 os.chdir("../Data/Probleme_Cholet_1_bis/")
-
-import numpy as np
 
 # Load necessary data
 with open("init_sol_Cholet_pb1_bis.pickle", "rb") as f:
     init_solu = pickle.load(f)
+
 np.savetxt('init_solu.txt', np.array(init_solu), fmt='%d')
 
 with open("dist_matrix_Cholet_pb1_bis.pickle", "rb") as f:
@@ -41,38 +42,51 @@ with open("weight_Cholet_pb1_bis.pickle", "rb") as f:
 
 def initialize_population(init_sol, population_size):
     population = [init_sol.copy() for _ in range(population_size)]
-    print(f"Génération 0: Solution initiale: {fitness(init_sol)} {init_sol}")
-    for i, individual in enumerate(population[1:]):
-        if i < population_size // 2:
-            individual = mutation(init_sol.copy(), random.randint(1, 5))
-        else:
-            individual = mutation(init_sol.copy(), random.randint(10, 15))
+    for individual in population:
+        subset = individual[1:-1]
+        random.shuffle(subset)
+        # subset = mutation(subset)
+        individual[1:-1] = subset
 
     return population
 
 
-def fitness(chemin) -> float:
+def fitness(chemin):
     total_distance = 0
     total_weight = 0
     total_time = 0
     penalty = 0
     for i, j in itertools.islice(zip(chemin, chemin[1:]), len(chemin) - 1):
         total_distance += dist_matrix[i][j]
-        #total_time += dur_matrix[i][j]
-        #total_time += collection_time[i]
+        # total_time += dur_matrix[i][j]
+        # total_time += collection_time[i]
         total_weight += weight_list[i]
         total_weight = max(total_weight, 0)
         if total_weight > WEIGHT_LIMIT:
             penalty += bad
-    #total_time += collection_time[chemin[-1]]
-    #if age > OLD_GENERATION:
-    #    return (total_distance + total_time + penalty) * (1 + 0.01 * age)
-    return total_distance + penalty  # + total_time
+    # total_time += collection_time[chemin[-1]]
+    return total_distance + total_time + penalty
+
+def fitness_worker(sub_population):
+    return [fitness(sol) for sol in sub_population]
+
+
+def parallel_fitness(population):
+    pool = multiprocessing.Pool(NUMBER_OF_PROCESSES)
+    # Diviser la population en sous-populations pour chaque processus
+    sub_populations = [population[i::NUMBER_OF_PROCESSES] for i in range(NUMBER_OF_PROCESSES)]
+    # Calculer la fitness de chaque sous-population en parallèle
+    fitness_values = pool.map(fitness_worker, sub_populations)
+    pool.close()
+    pool.join()
+    # Fusionner les résultats
+    return [item for sublist in fitness_values for item in sublist]
 
 
 def selection(population):
-    ranked_solutions = sorted([(fitness(s), s) for s in population], reverse=False)
-    return ranked_solutions[:POPULATION_SIZE // 10]
+    fitness_values = parallel_fitness(population)
+    ranked_solutions = sorted(zip(fitness_values, population), reverse=False)
+    return ranked_solutions[:POPULATION_SIZE // 4]
 
 
 def calculateVariance(population):
@@ -80,7 +94,19 @@ def calculateVariance(population):
     return sum((sol[0] - mean) ** 2 for sol in population) / len(population)
 
 
-def linear_base(variance, min_variance=100000, max_variance=500000, min_base=0.0005, max_base=1.01):
+def exponential_base(variance, a=0.01, b=1, c=1, d=0.0002):
+    base = a * np.log(b + variance) + c + d * (np.log(b + variance)) ** 3
+    return base
+
+
+# def calculate_base(variance):
+#     if variance > 230000:
+#         return 0.3 + (variance / 1000000)
+#     else:
+#         return 1.05 * np.exp(-variance / 230000)
+
+
+def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.0005, max_base=1.01):
     if variance <= min_variance:
         return max_base  # Grande base pour favoriser l'exploitation
     elif variance >= max_variance:
@@ -89,7 +115,7 @@ def linear_base(variance, min_variance=100000, max_variance=500000, min_base=0.0
         return max_base + (min_base - max_base) * ((variance - min_variance) / (max_variance - min_variance))
 
 
-def tournament_selection(population, variance, tournament_size=10):
+def tournament_selection(population, variance, tournament_size=25):
     n = len(population)
     # weights = [n - i for i in range(n)]
     base = linear_base(variance)  # exponential_base(variance)
@@ -119,50 +145,18 @@ def mutation(individual, length=3):
     start = random.randint(1, len(individual) - 2 - length)
     end = start + length
     segment = individual[start:end]
-    if random.random() < 0.5:  # Ajoute une chance de réverser le segment
-        segment = segment[::-1]
     del individual[start:end]
     new_position = random.randint(1, len(individual) - 2)
     individual = individual[:new_position] + segment + individual[new_position:]
     return individual
 
 
-def inversion_mutation(individual, length=3):
-    start = random.randint(1, len(individual) - 2 - length)
-    end = start + length
-    individual[start:end] = individual[start:end][::-1]
-    return individual
-
-
-def irgibnnm_mutation(individual, length=3):
-    # Start with inversion mutation
-    individual = inversion_mutation(individual, length)
-    # Then do the RGIBNNM mutation
-    random_gene = random.choice(individual[1:-1])
-    nearest_neighbor_index = find_nearest_neighbor(random_gene)
-    # Select one of the neighbors of the nearest neighbor, excluding 0 and 232
-    low_bound = nearest_neighbor_index - 5 if nearest_neighbor_index - 5 > 0 else 1
-    high_bound = nearest_neighbor_index + 5 if nearest_neighbor_index + 5 < 232 else 232
-    sublist = individual[low_bound:high_bound].copy()
-    neighbor = random.choice(sublist)
-    # Swap the random gene with the neighbor
-    individual[random_gene], individual[neighbor] = individual[neighbor], individual[random_gene]
-    return individual
-
-
-def find_nearest_neighbor(node):
-    return min((dist_matrix[node][i], i) for i in range(233) if i != node)[1]
-
-
-def genetic_algorithm(init_sol, population_size, best_scores, variances, carried_over_proportion=0.4):
+def genetic_algorithm(init_sol, population_size, best_scores, variances, carried_over_proportion=0.2):
     population = initialize_population(init_sol, population_size)
     start_time = time.time()
     generation = 0
     while time.time() - start_time < 600:
-        carried_over_proportion = 0.4 + (0.6 * ((time.time() - start_time) / 600))
         population = selection(population)
-        if generation == 0:
-            print(population[0][1])
 
         best_score = population[0][0]
         best_scores.append(best_score)
@@ -175,14 +169,19 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances, carried
         # variances.append(population_variance)
 
         new_population = []
-        new_population.extend(individual[1] for individual in population[:int(round(len(population) * carried_over_proportion, 0))])
+
+        new_population.extend(
+            individual[1] for individual in population[:int(round(len(population) * carried_over_proportion, 0))])
 
         while len(new_population) < population_size // 2:
             parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population,
                                                                                                            population_variance)
+            # child1, child2 = crossover(parent1[0], parent1[1], parent2[0], parent2[1])
             child = crossover(parent1[1], parent2[1])
+            # child1, child2 = inversion_mutation(child1, random.randint(1, 5)), inversion_mutation(child2, random.randint(1, 5))
             child = mutation(child, random.randint(1, 5))
             new_population.append(child)
+            # new_population.append(child2)
 
         while len(new_population) < population_size:
             parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population,
@@ -210,10 +209,6 @@ def calculateDandT(l):
 def has_duplicates(lst):
     return len(lst) != len(set(lst))
 
-def is_permutation(lst):
-    expected = set(range(233))  # Ensemble des nombres de 0 à 232 inclus
-    received = set(lst)
-    return expected == received and len(lst) == 233
 
 best_scores = []
 variances = []
@@ -229,7 +224,6 @@ distance, temps = calculateDandT(best_solution)
 print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
 print(f"Fitness: {distance + temps}")
 print(has_duplicates(best_solution))
-print(is_permutation(best_solution))
 
 distance, temps = calculateDandT(init_solu)
 print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
@@ -237,59 +231,3 @@ print(f"fitness sol initiale : {distance + temps}")
 
 plt.scatter(generation, fitness)
 plt.show()
-
-# generation = [i for i in range(len(best_scores))]
-# variance = [s for s in variances]
-#
-# plt.scatter(generation, variance)
-# plt.show()
-
-
-# def calculate_mass(parent):
-#    mass = []
-#    for i in range(len(parent)):
-#        left_neighbor = parent[i - 1] if i > 0 else -1
-#        right_neighbor = parent[i + 1] if i < len(parent) - 1 else -1
-#        if left_neighbor == -1 :
-#
-#        mass.append(dist_matrix[parent[i]][left_neighbor] + dist_matrix[parent[i]][right_neighbor])
-#    return mass
-#
-# def calculate_velocity(parent):
-#    return sum(dist_matrix[parent[i]][parent[i + 1]] for i in range(len(parent) - 1)) / len(parent)
-#
-# def collision(m1, m2, v1, v2):
-#    v1_prime = ((m1 - m2) / (m1 + m2)) * v1 + ((2 * m2) / (m1 + m2)) * v2
-#    v2_prime = ((2 * m1) / (m1 + m2)) * v1 - ((m1 - m2) / (m1 + m2)) * v2
-#    return v1_prime, v2_prime
-#
-# def crossover(fitness1,parent1, fitness2, parent2):
-#    offspring1 = parent1.copy()
-#    offspring2 = parent2.copy()
-#
-#    #total_velocity1 = calculate_velocity(parent1)
-#    #total_velocity2 = calculate_velocity(parent2)
-#    for i in range(len(parent1)):
-#        mass1 = 0
-#        mass2 = 0
-#        left_neighbor1 = parent1[i - 1] if i > 0 else -1
-#        right_neighbor1 = parent1[i + 1] if i < len(parent1) - 1 else -1
-#        if left_neighbor1 != -1:
-#            mass1 += dist_matrix[parent1[i]][left_neighbor1]
-#        if right_neighbor1 != -1:
-#            mass1 += dist_matrix[parent1[i]][right_neighbor1]
-#
-#        left_neighbor2 = parent2[i - 1] if i > 0 else -1
-#        right_neighbor2 = parent2[i + 1] if i < len(parent2) - 1 else -1
-#        if left_neighbor2 != -1:
-#            mass2 += dist_matrix[parent2[i]][left_neighbor2]
-#        if right_neighbor2 != -1:
-#            mass2 += dist_matrix[parent2[i]][right_neighbor2]
-#
-#        v1_prime, v2_prime = collision(mass1, mass2, fitness1, fitness2)#total_velocity1, total_velocity2)
-#        if v1_prime <= 0:
-#            offspring1[i] = parent2[i]
-#        if v2_prime <= 0:
-#            offspring2[i] = parent1[i]
-#
-#    return offspring1, offspring2
