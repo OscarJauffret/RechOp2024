@@ -3,14 +3,14 @@ import concurrent.futures
 
 def run_script():
     # Exécute le script et retourne la sortie
-    result = subprocess.run(['python', 'Pays_Cholet_age.py'], capture_output=True, text=True)
+    result = subprocess.run(['python', 'test41800Massacre_para.py'], capture_output=True, text=True)
     return float(result.stdout.strip())
 
 def main():
     results = []
     # Utilise ThreadPoolExecutor pour exécuter les scripts en parallèle
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(run_script) for _ in range(15)]
+        futures = [executor.submit(run_script) for _ in range(5)]
         for future in concurrent.futures.as_completed(futures):
             output = future.result()
             results.append(output)

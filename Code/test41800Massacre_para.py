@@ -13,7 +13,7 @@ POPULATION_SIZE = 1000
 WEIGHT_LIMIT = 5850
 bad = 999999
 ACCELERATED_MUTATION_NUMBER = 3
-OLD_GENERATION = 200
+STUCK_GEN_MAX = 800
 MUTATION_RATE = 0.9
 try:
     os.chdir("../Data/Probleme_Cholet_1_bis/")
@@ -34,8 +34,6 @@ with open("temps_collecte_Cholet_pb1_bis.pickle", "rb") as f:
 
 with open("weight_Cholet_pb1_bis.pickle", "rb") as f:
     weight_list = pickle.load(f)
-
-# init_solu (notre meilleure actuelle) = [0, 80, 81, 82, 83, 84, 210, 85, 86, 87, 88, 78, 89, 90, 212, 219, 213, 214, 216, 204, 211, 155, 109, 77, 160, 112, 152, 151, 226, 148, 200, 9, 145, 51, 52, 53, 65, 55, 56, 139, 57, 138, 129, 20, 137, 60, 61, 120, 222, 42, 175, 96, 5, 93, 121, 128, 127, 189, 15, 94, 23, 25, 26, 27, 28, 24, 126, 125, 124, 123, 95, 103, 104, 105, 34, 132, 131, 130, 35, 36, 37, 38, 39, 106, 136, 135, 134, 107, 16, 40, 122, 133, 17, 18, 19, 108, 169, 172, 168, 167, 43, 44, 45, 46, 47, 48, 49, 166, 165, 164, 147, 4, 12, 68, 191, 146, 187, 69, 163, 221, 229, 29, 1, 2, 199, 116, 67, 186, 10, 11, 117, 158, 118, 159, 144, 143, 41, 13, 14, 142, 227, 195, 62, 63, 54, 194, 196, 197, 6, 7, 8, 218, 198, 119, 193, 176, 64, 70, 58, 59, 185, 141, 192, 140, 50, 21, 22, 31, 202, 32, 33, 71, 72, 66, 207, 97, 224, 113, 76, 156, 209, 217, 215, 231, 114, 149, 173, 201, 174, 188, 73, 150, 190, 30, 181, 3, 208, 220, 110, 92, 157, 111, 180, 179, 171, 228, 170, 161, 183, 182, 91, 206, 230, 162, 177, 178, 100, 101, 184, 115, 79, 98, 99, 203, 154, 153, 102, 74, 205, 75, 225, 223, 232]
 
 
 def initialize_population(init_sol, population_size):
@@ -77,7 +75,7 @@ def calculateVariance(population):
 
 
 # NB : le 41.8km a été obtenu en utilisant max_variance = 1_000_000 et min_variance = 100_000
-def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.0005, max_base=1.01):
+def linear_base(variance, min_variance=100000, max_variance=200000, min_base=0.0005, max_base=1.01):
     if variance <= min_variance:
         return min_base     # Petite base pour favoriser l'exploration
     elif variance >= max_variance:
@@ -133,13 +131,15 @@ def mutation(individual, length=3):
     individual = individual[:new_position] + segment + individual[new_position:]
     return individual
 
-def swap_mutation(individual):
-    i, j = random.sample(range(1, len(individual) - 1), 2)
-    individual[i], individual[j] = individual[j], individual[i]
-    return individual
+#def swap_mutation(individual):
+#    i, j = random.sample(range(1, len(individual) - 1), 2)
+#    individual[i], individual[j] = individual[j], individual[i]
+#    return individual
 
 
 def genetic_algorithm(init_sol, population_size, best_scores):
+    global MUTATION_RATE
+    original_mutation_rate = MUTATION_RATE  # Enregistrer la valeur originale de MUTATION_RATE
     population = initialize_population(init_sol, population_size)
     start_time = time.time()
     generation = 0
@@ -150,12 +150,13 @@ def genetic_algorithm(init_sol, population_size, best_scores):
             population = selection(population, pool)
 
             best_score = population[0][0][0]
-            best_scores.append(best_score)
+            best_scores.append((best_score,population[0][1]))
 
             if best_score == previous_score:
                 stuck_generations += 1
             else:
                 stuck_generations = 0
+                #print("Je me reset")
                 previous_score = best_score
 
             generation += 1
@@ -166,12 +167,27 @@ def genetic_algorithm(init_sol, population_size, best_scores):
             variances.append(population_variance)
 
             new_population = []
-            new_population.extend(individual[1] for individual in population[:population_size // 50])
+            if stuck_generations >= STUCK_GEN_MAX:
+            ## Réinitialisation partielle : introduire des nouveaux individus aléatoires
+            #    #print("Massacre en douceur")
+            #    num_new_individuals = int(POPULATION_SIZE // 1.1)
+            #    new_population.extend(initialize_population(init_sol, num_new_individuals))
+            #    new_population.extend(individual[1] for individual in population[num_new_individuals:])
+            #    MUTATION_RATE = 1.0  # Augmenter le taux de mutation à 100% pour cette génération
+                #print("MASACREEEEEEEEEEEE")
+                new_population = initialize_population(init_sol, POPULATION_SIZE)
+            elif stuck_generations >= 50: 
+                #print("Recadrement")
+                population=population[50:]  #Delete the 50 best solutions
+                new_population.extend(individual[1] for individual in population) 
+            else:
+                new_population.extend(individual[1] for individual in population[:population_size // 50]) 
+
             while len(new_population) < population_size // 2:
-                parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(
-                    population, population_variance)
+                parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population, population_variance)
                 child = crossover(parent1[1], parent2[1], parent1[0][1], parent2[0][1])
-                mutation_length = random.randint(2, 6) if stuck_generations > 10 else random.randint(1, 3)
+                #mutation_length = random.randint(2, 6) if stuck_generations > 10 else random.randint(1, 3)
+                mutation_length = random.randint(20, 50) if stuck_generations > STUCK_GEN_MAX else random.randint(2,6)
                 if random.random() < MUTATION_RATE:
                     #if rand := random.randint(1, 3) == 1:
                     child = mutation(child, mutation_length)
@@ -184,7 +200,8 @@ def genetic_algorithm(init_sol, population_size, best_scores):
                 parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(
                     population, population_variance)
                 child = crossover(parent1[1], parent2[1], parent1[0][1], parent2[0][1])
-                mutation_length = random.randint(6, 18) if stuck_generations > 10 else random.randint(3, 9)
+                #mutation_length = random.randint(6, 18) if stuck_generations > 10 else random.randint(3, 9)
+                mutation_length = random.randint(60, 90) if stuck_generations > STUCK_GEN_MAX else random.randint(6, 18)
                 if random.random() < MUTATION_RATE:
                     #if rand := random.randint(1, 3) == 1:
                     child = mutation(child, mutation_length)
@@ -194,6 +211,7 @@ def genetic_algorithm(init_sol, population_size, best_scores):
                 new_population.append(child)
 
             population = new_population
+            MUTATION_RATE = original_mutation_rate  # Réinitialiser MUTATION_RATE à sa valeur originale
 
     return min(population, key=fitness)
 
@@ -222,20 +240,20 @@ if __name__ == "__main__":
     best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
 
     generation = [i for i in range(len(best_scores))]
-    fitness = [s for s in best_scores]
+    fitness = [s[0] for s in best_scores]
 
-    #print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
-    print(min(best_scores))
+    #print(f"La meilleure solutions jamais obtenue est : {min(best_scores)[0]}, avec ce chemin : {min(best_scores)[1]}")
+    print(min(best_scores)[0])
     #print(best_solution)
     #distance, temps = calculateDandT(best_solution)
     #print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
     #print(f"Fitness: {distance + temps}")
     #print(has_duplicates(best_solution))
     #print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
-#
+
     #distance, temps = calculateDandT(init_solu)
     #print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
     #print(f"fitness sol initiale : {distance + temps}")
-
+#
     #plt.scatter(generation, fitness)
     #plt.show()
