@@ -243,7 +243,7 @@ if __name__ == "__main__":
     fitness = [s[0] for s in best_scores]
 
     #print(f"La meilleure solutions jamais obtenue est : {min(best_scores)[0]}, avec ce chemin : {min(best_scores)[1]}")
-    print(min(best_scores)[0])
+    print(f"{min(best_scores)[0]};{min(best_scores)[1]}")  # Utiliser un point-virgule
     #print(best_solution)
     #distance, temps = calculateDandT(best_solution)
     #print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
