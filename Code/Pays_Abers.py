@@ -4,18 +4,20 @@ import random
 import pickle
 import os
 import time
-import numpy as np
-from matplotlib import pyplot as plt
 import math
-from functools import lru_cache
+import matplotlib.pyplot as plt
+
 
 ACCELERATED_MUTATION_THRESHOLD = 1000
-POPULATION_SIZE = 1000
+POPULATION_SIZE = 500
 WEIGHT_LIMIT = 5850
 bad = 999999
 ACCELERATED_MUTATION_NUMBER = 3
 OLD_GENERATION = 200
 MUTATION_RATE = 0.9
+SCRAMBLE_MUTATION_RATE = 0.2
+NORMAL_MUTATION_LENGTHS = [(2, 6), (3, 9)]  # [(random.randint(2, 5), random.randint(6, 8)), (random.randint(3, 6), random.randint(8, 10))]
+HEAVY_MUTATION_LENGTHS = [(3, 9), (6, 18)]  # [(random.randint(3, 6), random.randint(8, 10)), (random.randint(6, 10), random.randint(15, 20))]
 try:
     os.chdir("../Data/Probleme_Abers_2/")
 except FileNotFoundError:
@@ -80,7 +82,7 @@ bilat_pairs_dict = create_dict(bilat_pairs)
 def selection(population, pool):
     fitness_values = pool.map(fitness, population)
     ranked_solutions = sorted(zip(fitness_values, population), reverse=False)
-    return ranked_solutions[:POPULATION_SIZE // 6]
+    return ranked_solutions[:POPULATION_SIZE // 5]
 
 
 def calculateVariance(population):
@@ -89,7 +91,7 @@ def calculateVariance(population):
 
 
 # NB : le 41.8km a été obtenu en utilisant max_variance = 1_000_000 et min_variance = 100_000
-def linear_base(variance, min_variance=250000, max_variance=350000, min_base=0.0005, max_base=1.01):
+def linear_base(variance, min_variance=100000, max_variance=400000, min_base=0.0005, max_base=1.01):
     if variance <= min_variance:
         return min_base  # Petite base pour favoriser l'exploration
     elif variance >= max_variance:
@@ -139,10 +141,12 @@ def mutation(individual, length=3):
     start = random.randint(1, len(individual) - 2 - length)
     end = start + length
     segment = individual[start:end]
-    if random.random() < 0.2:
-        subset = segment[1:-1]
-        random.shuffle(subset)
-        segment[1:-1] = subset
+    # if random.random() < 0.1:
+    #     subset = segment[1:-1]
+    #     random.shuffle(subset)
+    #     segment[1:-1] = subset
+        #index = random.randint(1, len(segment) - 2)
+        #segment[index], segment[index + 1] = segment[index + 1], segment[index]
     if start - 1 != 0:
         individual = swap_with_pair(individual, start - 1)
     individual = swap_with_pair(individual, start)
@@ -169,21 +173,35 @@ def swap_with_pair(individual, index=-1):
 def create_new_child(population, population_variance, stuck_generations, is_heavily_mutated_part):
     if is_heavily_mutated_part:
         # Format: [(Normal mutation min length, Normal mutation max length), (Accelerated mutation min length, Accelerated mutation max length)]
-        mutation_length_values = [(3, 9), (6, 18)]
+        mutation_length_values = HEAVY_MUTATION_LENGTHS
         # Format: (Random bilateral swaps min, Random bilateral swaps max)
-        random_bilat_swaps_values = (1, 8)
+        random_bilat_swaps_values = (1, 2)
     else:
-        mutation_length_values = [(2, 6), (3, 9)]
-        random_bilat_swaps_values = (1, 5)
+        mutation_length_values = NORMAL_MUTATION_LENGTHS
+        random_bilat_swaps_values = (1, 3)
     parent1 = tournament_selection(population, population_variance)
     parent2 = tournament_selection(population, population_variance)
     child = crossover(parent1[1], parent2[1], parent1[0][1], parent2[0][1])
-    mutation_length = random.randint(mutation_length_values[1][0], mutation_length_values[1][1]) if stuck_generations > 10 else random.randint(mutation_length_values[0][0], mutation_length_values[0][1])
+    if stuck_generations > 100:
+        mutation_length = random.randint(10, 20)
+    elif stuck_generations > 50:
+        mutation_length = random.randint(5, 10)
+    else:
+        mutation_length = random.randint(1, 5)
+    #else:
+    #    if stuck_generations > 100:
+    #        mutation_length = random.randint(12, 21)
+    #    elif stuck_generations > 50:
+    #        mutation_length = random.randint(8, 12)
+    #    else:
+    #        mutation_length = random.randint(3, 8)
+    #mutation_length = random.randint(mutation_length_values[1][0], mutation_length_values[1][1]) if stuck_generations > 10 else random.randint(mutation_length_values[0][0], mutation_length_values[0][1])
     if random.random() < MUTATION_RATE:
         child = mutation(child, mutation_length)
-        random_bilat_swaps = random.randint(random_bilat_swaps_values[0], random_bilat_swaps_values[1])
-        for _ in range(random_bilat_swaps):
-            child = swap_with_pair(child)
+        #random_bilat_swaps = random.randint(random_bilat_swaps_values[0], random_bilat_swaps_values[1])
+        #for _ in range(random_bilat_swaps):
+        #    child = swap_mutation(child)
+
     return child
 
 
@@ -215,18 +233,18 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
             variances.append(population_variance)
 
             new_population = []
-            new_population.extend(individual[1] for individual in population[:population_size // 50])
+            new_population.extend(individual[1] for individual in population[:population_size // 30])
             while len(new_population) < population_size // 2:
                 child = create_new_child(population, population_variance, stuck_generations, False)
                 new_population.append(child)
 
-            while len(new_population) < 5 * population_size // 6:
+            while len(new_population) < population_size:
                 child = create_new_child(population, population_variance, stuck_generations, True)
                 new_population.append(child)
 
-            while len(new_population) < population_size:
-                new_individual = mutation(init_solu.copy(), random.randint(1, 5))
-                new_population.append(new_individual)
+            #while len(new_population) < population_size:
+            #    new_individual = mutation(init_solu.copy(), random.randint(1, 5))
+            #    new_population.append(new_individual)
 
             population = new_population
 
@@ -253,29 +271,29 @@ def ispermutation(l):
     return l[0] == 0 and l[-1] == init_solu[-1]
 
 
-# if __name__ == "__main__":
-#     best_scores = []
-#     variances = []
-#     best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
+#if __name__ == "__main__":
+#    best_scores = []
+#    variances = []
+#    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
 #
-#     generation = [i for i in range(len(best_scores))]
-#     fitness = [s for s in best_scores]
+#    generation = [i for i in range(len(best_scores))]
+#    fitness = [s for s in best_scores]
 #
-#     print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
+#    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
 #
-#     print(best_solution)
-#     distance, temps = calculateDandT(best_solution)
-#     print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-#     print(f"Fitness: {distance + temps}")
-#     print(has_duplicates(best_solution))
-#     print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
+#    print(best_solution)
+#    distance, temps = calculateDandT(best_solution)
+#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+#    print(f"Fitness: {distance + temps}")
+#    print(has_duplicates(best_solution))
+#    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
 #
-#     distance, temps = calculateDandT(init_solu)
-#     print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-#     print(f"fitness sol initiale : {distance + temps}")
+#    distance, temps = calculateDandT(init_solu)
+#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+#    print(f"fitness sol initiale : {distance + temps}")
 #
-#     plt.scatter(generation, fitness)
-#     plt.show()
+#    plt.scatter(generation, fitness)
+#    plt.show()
 
 if __name__ == "__main__":
     best_scores = []
@@ -288,6 +306,7 @@ if __name__ == "__main__":
         "best_solution": best_solution,
         "distance_time": calculateDandT(best_solution),
         "generation_best_scores": best_scores,
+        "population_size": POPULATION_SIZE,
     }
 
     os.chdir("../../Code")
