@@ -218,6 +218,7 @@ def crossover(parent1: list[int], parent2: list[int], parent_1_worst_gene: int, 
             if gene not in child_set:
                 child.append(gene)
                 child_set.add(gene)
+                child_set.add(bilat_pairs_dict.get(gene, 0)) 
 
     # Add remaining elements from parents to complete the child
     for parent in [parent1, parent2]:
@@ -225,6 +226,7 @@ def crossover(parent1: list[int], parent2: list[int], parent_1_worst_gene: int, 
             if gene not in child_set:
                 child.append(gene)
                 child_set.add(gene)
+                child_set.add(bilat_pairs_dict.get(gene, 0)) 
     return child
 
 
@@ -315,14 +317,6 @@ def create_new_child(population, population_variance, stuck_generations, is_heav
     list: A new child created from selected parents with applied genetic operations.
     """
 
-    if is_heavily_mutated_part:
-        # Format: [(Normal mutation min length, Normal mutation max length), (Accelerated mutation min length, Accelerated mutation max length)]
-        mutation_length_values = HEAVY_MUTATION_LENGTHS
-        # Format: (Random bilateral swaps min, Random bilateral swaps max)
-        random_bilat_swaps_values = (1, 2)
-    else:
-        mutation_length_values = NORMAL_MUTATION_LENGTHS
-        random_bilat_swaps_values = (1, 3)
     parent1 = tournament_selection(population, population_variance)
     parent2 = tournament_selection(population, population_variance)
     child = crossover(parent1[1], parent2[1], parent1[0][1], parent2[0][1])
@@ -381,7 +375,7 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
     previous_score = 0
 
     with multiprocessing.Pool() as pool:     # Use multiprocessing to handle parallel computation of fitness evaluations
-        while time.time() - start_time < 600:    # Run until 10 minutes
+        while time.time() - start_time < 60:    # Run until 10 minutes
             
             population = selection(population, pool, stuck_generations)
             # print(f"Genetic diversity: {genetic_diversity(population)}")

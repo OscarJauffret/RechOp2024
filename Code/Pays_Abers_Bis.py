@@ -183,6 +183,7 @@ def crossover(parent1: list[int], parent2: list[int], parent_1_worst_gene: int, 
             if gene not in child_set:
                 child.append(gene)
                 child_set.add(gene)
+                child_set.add(bilat_pairs_dict.get(gene, 0)) 
 
     # Add the remaining genes from the parents to the child
     for parent in [parent1, parent2]:
@@ -190,6 +191,7 @@ def crossover(parent1: list[int], parent2: list[int], parent_1_worst_gene: int, 
             if gene not in child_set:
                 child.append(gene)
                 child_set.add(gene)
+                child_set.add(bilat_pairs_dict.get(gene, 0)) 
 
     return child
 
