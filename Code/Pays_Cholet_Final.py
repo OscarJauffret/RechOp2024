@@ -295,25 +295,25 @@ def genetic_algorithm(init_sol, population_size, best_scores):
 
     return min(population, key=fitness)
 
-#def calculateDandT(l):
-#    """
-#    Calculate the total distance and time for a given route.
-#
-#    Parameters:
-#    l (list): A route represented as a list of node indices.
-#
-#    Returns:
-#    tuple: Total distance and time for the route.
-#    """
-#
-#    distance = 0
-#    time = 0
-#    for i in range(len(l)):
-#        if i != len(l) - 1:
-#            distance += dist_matrix[l[i]][l[i + 1]]
-#            time += dur_matrix[l[i]][l[i + 1]]
-#        time += collection_time[l[i]]
-#    return distance, time
+def calculateDandT(l):
+    """
+    Calculate the total distance and time for a given route.
+
+    Parameters:
+    l (list): A route represented as a list of node indices.
+
+    Returns:
+    tuple: Total distance and time for the route.
+    """
+
+    distance = 0
+    time = 0
+    for i in range(len(l)):
+        if i != len(l) - 1:
+            distance += dist_matrix[l[i]][l[i + 1]]
+            time += dur_matrix[l[i]][l[i + 1]]
+        time += collection_time[l[i]]
+    return distance, time
 
 def has_duplicates(lst):
     """
@@ -343,44 +343,44 @@ def ispermutation(l):
     return sorted(l) == list(range(233)) and l[0] == 0 and l[-1] == 232
 
 
-#if __name__ == "__main__":
-#    best_scores = []
-#    variances = []
-#    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
-#
-#    generation = [i for i in range(len(best_scores))]
-#    fitness = [s[0] for s in best_scores]
-#
-#    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)[0]} avec le chemin : {min(best_scores)[1]}")
-#    #print(f"{min(best_scores)[0]};{min(best_scores)[1]}")
-#    print(best_solution)
-#    distance, temps = calculateDandT(best_solution)
-#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-#    print(f"Fitness: {distance + temps}")
-#    print(has_duplicates(best_solution))
-#    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
-#    distance, temps = calculateDandT(init_solu)
-#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-#    print(f"fitness sol initiale : {distance + temps}")
-#
-#    # Plot a graph to see the evolution 
-#    plt.scatter(generation, fitness)
-#    plt.show()
-#
-
 if __name__ == "__main__":
     best_scores = []
     variances = []
-
     best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
 
-    result = {
-        "best_score": min(best_scores),
-        "best_solution": best_solution,
-        "distance_time": calculateDandT(best_solution, dist_matrix, dur_matrix, collection_time),
-        "generation_best_scores": best_scores,
-    }
+    generation = [i for i in range(len(best_scores))]
+    fitness = [s[0] for s in best_scores]
 
-    os.chdir("../../Code")
-    with open("resultCholet.pkl", "wb") as f:
-        pickle.dump(result, f)
+    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)[0]} avec le chemin : {min(best_scores)[1]}")
+    #print(f"{min(best_scores)[0]};{min(best_scores)[1]}")
+    print(best_solution)
+    distance, temps = calculateDandT(best_solution)
+    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+    print(f"Fitness: {distance + temps}")
+    print(has_duplicates(best_solution))
+    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
+    distance, temps = calculateDandT(init_solu)
+    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+    print(f"fitness sol initiale : {distance + temps}")
+
+    # Plot a graph to see the evolution 
+    plt.scatter(generation, fitness)
+    plt.show()
+
+
+#if __name__ == "__main__":
+#    best_scores = []
+#    variances = []
+#
+#    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
+#
+#    result = {
+#        "best_score": min(best_scores),
+#        "best_solution": best_solution,
+#        "distance_time": calculateDandT(best_solution, dist_matrix, dur_matrix, collection_time),
+#        "generation_best_scores": best_scores,
+#    }
+#
+#    os.chdir("../../Code")
+#    with open("resultCholet.pkl", "wb") as f:
+#        pickle.dump(result, f)

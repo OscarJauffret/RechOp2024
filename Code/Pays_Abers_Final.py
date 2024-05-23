@@ -115,9 +115,9 @@ def create_dict(pairs):
 bilat_pairs_dict = create_dict(bilat_pairs)
 
 
-def selection(population, pool, stuck_generations):
+def selection(population, pool):
     """
-    Select the top individuals from the population based on fitness.
+    Select the top individuals from the population based on fitness calculated in parallel.
 
     Parameters:
     population (list): The current population of individuals.
@@ -232,20 +232,20 @@ def crossover(parent1: list[int], parent2: list[int], parent_1_worst_gene: int, 
 
 def mutation(individual, length=3):
     """
-    Perform a mutation on an individual by segment rearrangement and potential scrambling within the segment.
+    Perform a mutation on an individual by rearranging a segment and potentially scrambling it, 
+    followed by bilateral pair swaps.
 
-    This function selects a segment of the individual based on the given length, optionally scrambles the contents of
-    the segment, and then reinserts the (possibly scrambled) segment at a new position within the individual. This mutation
-    is designed to explore new genetic configurations by altering the sequence of genes.
+    This function selects a segment based on the given length, scrambles the contents if a random 
+    condition based on SCRAMBLE_MUTATION_RATE is met, and then reinserts the segment at a new 
+    position. It may swap adjacent genes with their bilateral pairs before and after the segment.
 
     Parameters:
     individual (list): The individual to mutate, represented as a list of gene indices.
     length (int): The length of the segment to extract and potentially scramble.
 
     Returns:
-    list: The mutated individual with the segment rearranged.
+    list: The mutated individual with the segment rearranged and adjacent genes potentially swapped.
     """
-
     # Randomly select the starting point of the segment to mutate
     start = random.randint(1, len(individual) - 2 - length)
     end = start + length
@@ -300,21 +300,18 @@ def swap_with_pair(individual, index=-1):
             individual[index] = bilat_pairs_dict[individual[index]]  # Swap
     return individual
 
-def create_new_child(population, population_variance, stuck_generations, is_heavily_mutated_part):
+def create_new_child(population, population_variance, stuck_generations):
     """
-    Create a new child by selecting parents and applying genetic operations such as crossover and mutation.
-
-    The mutation strategy varies depending on how long the population has been without improvements (stuck_generations) and
-    whether the child is part of a heavily mutated portion of the population.
+    Create a new child by selecting parents and applying genetic operations based on the population's current state.
 
     Parameters:
     population (list): The current population of individuals.
-    population_variance (float): The variance in fitness of the current population.
-    stuck_generations (int): Number of generations without significant fitness improvements.
-    is_heavily_mutated_part (bool): Flag indicating if heavier mutations should be applied.
+    population_variance (float): The variance in fitness within the current population, affecting mutation strategies.
+    stuck_generations (int): The number of consecutive generations without significant fitness improvements.
+    is_heavily_mutated_part (bool): Indicates whether to apply more aggressive mutations.
 
     Returns:
-    list: A new child created from selected parents with applied genetic operations.
+    list: A new child created through genetic operations including crossover and mutation.
     """
 
     parent1 = tournament_selection(population, population_variance)
@@ -461,43 +458,43 @@ def ispermutation(l):
     return l[0] == 0 and l[-1] == init_solu[-1]
 
 
-#if __name__ == "__main__":
-#    best_scores = []
-#    variances = []
-#    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
-#
-#    generation = [i for i in range(len(best_scores))]
-#    fitness = [s for s in best_scores]
-#
-#    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
-#
-#    print(best_solution)
-#    distance, temps = calculateDandT(best_solution)
-#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-#    print(f"Fitness: {distance + temps}")
-#    print(has_duplicates(best_solution))
-#    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
-#
-#    distance, temps = calculateDandT(init_solu)
-#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-#    print(f"fitness sol initiale : {distance + temps}")
-#
-#    plt.scatter(generation, fitness)
-#    plt.show()
-
 if __name__ == "__main__":
     best_scores = []
     variances = []
-
     best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
 
-    result = {
-        "best_score": min(best_scores),
-        "best_solution": best_solution,
-        "distance_time": calculateDandT(best_solution),
-        "generation_best_scores": best_scores,
-    }
+    generation = [i for i in range(len(best_scores))]
+    fitness = [s for s in best_scores]
 
-    os.chdir("../../Code")
-    with open("resultAbers.pkl", "wb") as f:
-        pickle.dump(result, f)
+    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
+
+    print(best_solution)
+    distance, temps = calculateDandT(best_solution)
+    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+    print(f"Fitness: {distance + temps}")
+    print(has_duplicates(best_solution))
+    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
+
+    distance, temps = calculateDandT(init_solu)
+    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+    print(f"fitness sol initiale : {distance + temps}")
+
+    plt.scatter(generation, fitness)
+    plt.show()
+
+#if __name__ == "__main__":
+#    best_scores = []
+#    variances = []
+#
+#    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
+#
+#    result = {
+#        "best_score": min(best_scores),
+#        "best_solution": best_solution,
+#        "distance_time": calculateDandT(best_solution),
+#        "generation_best_scores": best_scores,
+#    }
+#
+#    os.chdir("../../Code")
+#    with open("resultAbers.pkl", "wb") as f:
+#        pickle.dump(result, f)
