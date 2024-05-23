@@ -6,6 +6,7 @@ import os
 import time
 from matplotlib import pyplot as plt
 import math
+from utils import *
 
 # Define global constants for the genetic algorithm parameters and environment settings
 POPULATION_SIZE = 1000
@@ -42,7 +43,7 @@ def initialize_population(init_sol, population_size):
     Returns:
     list: A list of individuals representing the initial population.
     """
-    print(f"Génération 0: Solution initiale: {fitness(init_sol)} {init_sol}")
+    #print(f"Génération 0: Solution initiale: {fitness(init_sol)} {init_sol}")
     population = [init_sol.copy()]
     for _ in range(1, population_size):
         new_individual = mutation(init_sol.copy(), random.randint(1, 5))
@@ -70,6 +71,7 @@ def fitness(chemin):
             index_max_distance = j
         total_distance += dist_matrix[i][j]
         total_weight += weight_list[i]
+        total_weight = max(0, total_weight)
         if total_weight > WEIGHT_LIMIT:
             penalty += BAD
     return total_distance + penalty, index_max_distance
@@ -245,7 +247,7 @@ def genetic_algorithm(init_sol, population_size, best_scores):
             
             population = selection(population, pool)
             best_score = population[0][0][0]
-            best_scores.append((best_score,population[0][1]))
+            best_scores.append(best_score)
 
              # Check if the best score has changed from the previous generation
             if best_score == previous_score:
@@ -254,11 +256,11 @@ def genetic_algorithm(init_sol, population_size, best_scores):
                 stuck_generations = 0
                 previous_score = best_score
             generation += 1
-            print(f"Generation {generation}: {best_score}", end=" ")
+            #print(f"Generation {generation}: {best_score}", end=" ")
             
             # Calculate the variance of fitness scores in the population for dynamic adaptations
             population_variance = calculateVariance(population) 
-            print(f"Variance: {population_variance}")
+            #print(f"Variance: {population_variance}")
             variances.append(population_variance)
             
             # Create a new population starting with the best performing individuals
@@ -293,25 +295,25 @@ def genetic_algorithm(init_sol, population_size, best_scores):
 
     return min(population, key=fitness)
 
-def calculateDandT(l):
-    """
-    Calculate the total distance and time for a given route.
-
-    Parameters:
-    l (list): A route represented as a list of node indices.
-
-    Returns:
-    tuple: Total distance and time for the route.
-    """
-
-    distance = 0
-    time = 0
-    for i in range(len(l)):
-        if i != len(l) - 1:
-            distance += dist_matrix[l[i]][l[i + 1]]
-            time += dur_matrix[l[i]][l[i + 1]]
-        time += collection_time[l[i]]
-    return distance, time
+#def calculateDandT(l):
+#    """
+#    Calculate the total distance and time for a given route.
+#
+#    Parameters:
+#    l (list): A route represented as a list of node indices.
+#
+#    Returns:
+#    tuple: Total distance and time for the route.
+#    """
+#
+#    distance = 0
+#    time = 0
+#    for i in range(len(l)):
+#        if i != len(l) - 1:
+#            distance += dist_matrix[l[i]][l[i + 1]]
+#            time += dur_matrix[l[i]][l[i + 1]]
+#        time += collection_time[l[i]]
+#    return distance, time
 
 def has_duplicates(lst):
     """
@@ -341,26 +343,44 @@ def ispermutation(l):
     return sorted(l) == list(range(233)) and l[0] == 0 and l[-1] == 232
 
 
+#if __name__ == "__main__":
+#    best_scores = []
+#    variances = []
+#    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
+#
+#    generation = [i for i in range(len(best_scores))]
+#    fitness = [s[0] for s in best_scores]
+#
+#    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)[0]} avec le chemin : {min(best_scores)[1]}")
+#    #print(f"{min(best_scores)[0]};{min(best_scores)[1]}")
+#    print(best_solution)
+#    distance, temps = calculateDandT(best_solution)
+#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+#    print(f"Fitness: {distance + temps}")
+#    print(has_duplicates(best_solution))
+#    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
+#    distance, temps = calculateDandT(init_solu)
+#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+#    print(f"fitness sol initiale : {distance + temps}")
+#
+#    # Plot a graph to see the evolution 
+#    plt.scatter(generation, fitness)
+#    plt.show()
+#
+
 if __name__ == "__main__":
     best_scores = []
     variances = []
+
     best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
 
-    generation = [i for i in range(len(best_scores))]
-    fitness = [s[0] for s in best_scores]
+    result = {
+        "best_score": min(best_scores),
+        "best_solution": best_solution,
+        "distance_time": calculateDandT(best_solution, dist_matrix, dur_matrix, collection_time),
+        "generation_best_scores": best_scores,
+    }
 
-    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)[0]} avec le chemin : {min(best_scores)[1]}")
-    #print(f"{min(best_scores)[0]};{min(best_scores)[1]}")
-    print(best_solution)
-    distance, temps = calculateDandT(best_solution)
-    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-    print(f"Fitness: {distance + temps}")
-    print(has_duplicates(best_solution))
-    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
-    distance, temps = calculateDandT(init_solu)
-    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-    print(f"fitness sol initiale : {distance + temps}")
-
-    # Plot a graph to see the evolution 
-    plt.scatter(generation, fitness)
-    plt.show()
+    os.chdir("../../Code")
+    with open("resultCholet.pkl", "wb") as f:
+        pickle.dump(result, f)

@@ -23,7 +23,6 @@ try:
     os.chdir("../Data/Probleme_Abers_2_bis/")
 except FileNotFoundError:
     pass
-
 # Load the initial solution and transform it
 init_solu = load_data("init_sol_Abers_pb2_bis.pickle")
 init_solu = transform_data(init_solu)
@@ -273,7 +272,7 @@ def swap_with_pair(individual, index=-1):
 
 
 
-def genetic_algorithm(init_sol, population_size, best_scores, variances):
+def genetic_algorithm(init_sol, population_size, best_scores):
     population = initialize_population(init_sol, population_size)
     start_time = time.time()
     generation = 0
@@ -293,10 +292,10 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
                 previous_score = best_score
 
             generation += 1
-            print(f"Generation {generation}: {best_score}", end=" ")
+            #print(f"Generation {generation}: {best_score}", end=" ")
 
             population_variance = calculateVariance(population)
-            print(f"Variance: {population_variance}")
+            #print(f"Variance: {population_variance}")
             variances.append(population_variance)
 
             new_population = []
@@ -329,44 +328,61 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
     return min(population, key=fitness)
 
 
+#if __name__ == "__main__":
+#    # Initialize lists to store the best scores and variances
+#    best_scores = []
+#    variances = []
+#
+#    # Run the genetic algorithm and get the best solution
+#    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
+#
+#    # Create lists for the generation numbers and fitness values
+#    generation = [i for i in range(len(best_scores))]
+#    fitness = [s for s in best_scores]
+#
+#    # Print the best score ever obtained
+#    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
+#
+#    # Print the best solution
+#    print(best_solution)
+#
+#    # Calculate and print the distance and time for the best solution
+#    distance, temps = calculateDandT(best_solution, dist_matrix, dur_matrix, collection_time)
+#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+#
+#    # Print the fitness of the best solution
+#    print(f"Fitness: {distance + temps}")
+#
+#    # Check and print if the best solution has duplicates
+#    print(has_duplicates(best_solution))
+#
+#    # Check and print if the best solution is a permutation
+#    print(f"Est-ce une bonne solution ? {ispermutation(best_solution, init_solu)}")
+#
+#    # Calculate and print the distance and time for the initial solution
+#    distance, temps = calculateDandT(init_solu, dist_matrix, dur_matrix, collection_time)
+#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+#
+#    # Print the fitness of the initial solution
+#    print(f"fitness sol initiale : {distance + temps}")
+#
+#    # Plot the fitness values over generations
+#    plt.scatter(generation, fitness)
+#    plt.show()
+
 if __name__ == "__main__":
-    # Initialize lists to store the best scores and variances
     best_scores = []
     variances = []
 
-    # Run the genetic algorithm and get the best solution
-    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
+    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
 
-    # Create lists for the generation numbers and fitness values
-    generation = [i for i in range(len(best_scores))]
-    fitness = [s for s in best_scores]
+    result = {
+        "best_score": min(best_scores),
+        "best_solution": best_solution,
+        "distance_time": calculateDandT(best_solution, dist_matrix, dur_matrix, collection_time),
+        "generation_best_scores": best_scores,
+    }
 
-    # Print the best score ever obtained
-    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
-
-    # Print the best solution
-    print(best_solution)
-
-    # Calculate and print the distance and time for the best solution
-    distance, temps = calculateDandT(best_solution, dist_matrix, dur_matrix, collection_time)
-    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-
-    # Print the fitness of the best solution
-    print(f"Fitness: {distance + temps}")
-
-    # Check and print if the best solution has duplicates
-    print(has_duplicates(best_solution))
-
-    # Check and print if the best solution is a permutation
-    print(f"Est-ce une bonne solution ? {ispermutation(best_solution, init_solu)}")
-
-    # Calculate and print the distance and time for the initial solution
-    distance, temps = calculateDandT(init_solu, dist_matrix, dur_matrix, collection_time)
-    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-
-    # Print the fitness of the initial solution
-    print(f"fitness sol initiale : {distance + temps}")
-
-    # Plot the fitness values over generations
-    plt.scatter(generation, fitness)
-    plt.show()
+    os.chdir("../../Code")
+    with open("resultAbers_Bis.pkl", "wb") as f:
+        pickle.dump(result, f)
