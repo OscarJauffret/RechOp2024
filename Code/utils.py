@@ -45,7 +45,7 @@ def create_dict(pairs):
         pair_dict[pair[1]] = pair[0]
     return pair_dict
 
-def calculateDandT(l, dist_matrix, dur_matrix, collection_time):
+def calculate_D_and_T(l, dist_matrix, dur_matrix, collection_time):
     """
     Calculate the total distance and time for a given route.
 
@@ -85,7 +85,7 @@ def has_duplicates(lst):
     return len(lst) != len(set(lst))
 
 
-def ispermutation(l, init_solu):
+def is_permutation(l, init_solu):
     """
     Check if a list is a permutation.
 
@@ -100,15 +100,16 @@ def ispermutation(l, init_solu):
     """
     return l[0] == 0 and l[-1] == init_solu[-1]
 
-def calculateVariance(population):
+def calculate_variance(population):
     """
-    Calculate the variance of the fitness values in the population.
+    Calculate the variance of fitness values within the population.
 
     Parameters:
-    population (list): The population.
+    population (list): The current population whose fitness variance is to be calculated.
 
     Returns:
-    float: The variance of the fitness values.
+    float: The variance of the fitness values within the population.
     """
+
     mean = sum(sol[0][0] for sol in population) / len(population)
     return sum((sol[0][0] - mean) ** 2 for sol in population) / len(population)
