@@ -52,7 +52,7 @@ def initialize_population(init_sol, population_size):
     list: A list of individuals representing the initial population.
     """
 
-    print(f"Génération 0: Solution initiale: {fitness(init_sol)} {init_sol}")
+    #print(f"Génération 0: Solution initiale: {fitness(init_sol)} {init_sol}")
     population = [init_sol.copy()]
     for _ in range(1, population_size):
         new_individual = mutation(init_sol.copy(), random.randint(1, 5))
@@ -375,7 +375,7 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
     previous_score = 0
 
     with multiprocessing.Pool() as pool:     # Use multiprocessing to handle parallel computation of fitness evaluations
-        while time.time() - start_time < 60:    # Run until 10 minutes
+        while time.time() - start_time < 600:    # Run until 10 minutes
             
             population = selection(population, pool, stuck_generations)
             # print(f"Genetic diversity: {genetic_diversity(population)}")
@@ -389,11 +389,11 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
                 stuck_generations = 0
                 previous_score = best_score
             generation += 1
-            print(f"Generation {generation}: {best_score}", end=" ")
+            #print(f"Generation {generation}: {best_score}", end=" ")
             
             # Calculate the variance of fitness scores in the population for dynamic adaptations
             population_variance = calculateVariance(population)
-            print(f"Variance: {population_variance}")
+            #print(f"Variance: {population_variance}")
             variances.append(population_variance)
 
             # Create a new population starting with the best performing individuals
@@ -461,46 +461,43 @@ def ispermutation(l):
     return l[0] == 0 and l[-1] == init_solu[-1]
 
 
-if __name__ == "__main__":
-    best_scores = []
-    variances = []
-    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
-
-    generation = [i for i in range(len(best_scores))]
-    fitness = [s for s in best_scores]
-
-    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
-
-    print(best_solution)
-    distance, temps = calculateDandT(best_solution)
-    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-    print(f"Fitness: {distance + temps}")
-    print(has_duplicates(best_solution))
-    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
-
-    distance, temps = calculateDandT(init_solu)
-    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-    print(f"fitness sol initiale : {distance + temps}")
-
-    plt.scatter(generation, fitness)
-    plt.show()
-
 #if __name__ == "__main__":
 #    best_scores = []
 #    variances = []
-#
 #    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
 #
-#    result = {
-#        "best_score": min(best_scores),
-#        "best_solution": best_solution,
-#        "distance_time": calculateDandT(best_solution),
-#        "generation_best_scores": best_scores,
-#        "scramble_mutation_rate": SCRAMBLE_MUTATION_RATE,
-#        "normal_mutation_lengths": NORMAL_MUTATION_LENGTHS,
-#        "heavy_mutation_lengths": HEAVY_MUTATION_LENGTHS,
-#    }
+#    generation = [i for i in range(len(best_scores))]
+#    fitness = [s for s in best_scores]
 #
-#    os.chdir("../../Code")
-#    with open("result.pkl", "wb") as f:
-#        pickle.dump(result, f)
+#    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
+#
+#    print(best_solution)
+#    distance, temps = calculateDandT(best_solution)
+#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+#    print(f"Fitness: {distance + temps}")
+#    print(has_duplicates(best_solution))
+#    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
+#
+#    distance, temps = calculateDandT(init_solu)
+#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+#    print(f"fitness sol initiale : {distance + temps}")
+#
+#    plt.scatter(generation, fitness)
+#    plt.show()
+
+if __name__ == "__main__":
+    best_scores = []
+    variances = []
+
+    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
+
+    result = {
+        "best_score": min(best_scores),
+        "best_solution": best_solution,
+        "distance_time": calculateDandT(best_solution),
+        "generation_best_scores": best_scores,
+    }
+
+    os.chdir("../../Code")
+    with open("resultAbers.pkl", "wb") as f:
+        pickle.dump(result, f)

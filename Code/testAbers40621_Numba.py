@@ -6,10 +6,8 @@ import os
 import time
 import math
 import matplotlib.pyplot as plt
-from numba import cuda, float32
+from numba import cuda, int32
 import numpy as np
-
-fitness_dtype = np.dtype([('fitness', np.float32), ('max_distance_index', np.int32)])
 
 # Define global constants used throughout the code
 ACCELERATED_MUTATION_THRESHOLD = 1000
@@ -43,23 +41,27 @@ with open("temps_collecte_Abers_pb2.pickle", "rb") as f:
 with open("bilat_pairs_Abers_pb2.pickle", "rb") as f:
     bilat_pairs = pickle.load(f)
 
-def initialize_population(init_sol, population_size):
-    """
-    Initialize the population with the given initial solution and apply random mutations.
+def initialize_population_gpu(init_sol, population_size, mutation_rate=0.9):
+    n_cities = len(init_sol)
+    # Créer un tableau sur le GPU où la population sera stockée
+    population_device = cuda.device_array((population_size, n_cities), dtype=np.int32)
 
-    Parameters:
-    init_sol (np.ndarray): The initial solution from which to derive the first population.
-    population_size (int): The total number of individuals in the population.
+    # Initialiser la première solution
+    population_device[0] = init_sol
 
-    Returns:
-    np.ndarray: A 2D array representing the initial population.
-    """
-    population = [init_sol.copy()]
-    for _ in range(1, population_size):
-        new_individual = mutation(init_sol.copy(), random.randint(1, 5))
-        population.append(new_individual)
-    population = np.array([np.array(ind) for ind in population])
-    return population
+    # Dupliquer la solution initiale pour remplir la population
+    for i in range(1, population_size):
+        population_device[i] = init_sol
+
+    # Configurer les états de génération aléatoire pour chaque thread
+    rng_states = cuda.random.create_xoroshiro128p_states(population_size * n_cities, seed=12)
+
+    # Appliquer la mutation à la population
+    threads_per_block = 256
+    blocks_per_grid = (population_size + threads_per_block - 1) // threads_per_block
+    mutation_kernel[blocks_per_grid, threads_per_block](population_device, mutation_rate, n_cities, rng_states)
+
+    return population_device
 
 
 @cuda.jit
@@ -204,101 +206,130 @@ def linear_base(variance, min_variance=100000, max_variance=250000, min_base=0.0
     else:
         return max_base + (min_base - max_base) * ((variance - min_variance) / (max_variance - min_variance))
 
-def tournament_selection(population, variance, tournament_size=3):
-    """
-    Perform tournament selection from the population based on fitness calculated weights.
+@cuda.jit
+def tournament_selection_kernel(fitnesses, indices, winners, tournament_size):
+    # Chaque thread gère un tournoi
+    idx = cuda.grid(1)
+    if idx < winners.size:
+        best_index = -1
+        best_fitness = float('inf')
+        for i in range(tournament_size):
+            competitor_idx = indices[idx * tournament_size + i]
+            competitor_fitness = fitnesses[competitor_idx]
+            if competitor_fitness < best_fitness:
+                best_fitness = competitor_fitness
+                best_index = competitor_idx
+        winners[idx] = best_index
 
-    Parameters:
-    population (list): The current population from which to select individuals.
-    variance (float): The variance of the population's fitness, affecting the selection pressure.
-    tournament_size (int): The number of individuals to consider in each tournament.
+def run_tournament_selection_on_gpu(fitnesses, population_size, tournament_size):
+    n_tournaments = population_size // tournament_size
 
-    Returns:
-    list: The selected individual who wins the tournament.
-    """
-    n = len(population)
-    base = linear_base(variance)
-    weights = np.exp(-base * np.arange(n))
-    selected_indices = np.random.choice(n, tournament_size, p=weights/weights.sum())
-    selected_individuals = [population[i] for i in selected_indices]
-    return min(selected_individuals, key=lambda x: x[0])
+    # Créer un tableau de tous les indices sélectionnés pour les tournois
+    all_indices = np.random.randint(0, fitnesses.size, size=n_tournaments * tournament_size)
+    indices_device = cuda.to_device(all_indices)
+    winners_device = cuda.device_array(n_tournaments, dtype=np.int32)
 
-# Cut On Worst L+R Crossover
-def crossover(parent1, parent2, parent_1_worst_gene, parent_2_worst_gene):
-    """
-    Combine genes from two parents to create a new individual, focusing on cutting at the worst performing genes.
+    # Configuration du kernel
+    threads_per_block = 256
+    blocks_per_grid = (n_tournaments + threads_per_block - 1) // threads_per_block
 
-    Parameters:
-    parent1, parent2 (np.ndarray): The parent individuals.
-    parent_1_worst_gene, parent_2_worst_gene (int): Indices of the worst performing genes in each parent.
+    # Exécution du kernel
+    tournament_selection_kernel[blocks_per_grid, threads_per_block](fitnesses, indices_device, winners_device, tournament_size)
 
-    Returns:
-    np.ndarray: A new individual created by combining segments from both parents.
-    """
-    if parent_1_worst_gene < parent_2_worst_gene:
-        segment1 = parent1[1:parent_1_worst_gene]
-        segment2 = parent2[parent_1_worst_gene:parent_2_worst_gene]
-        segment3 = parent1[parent_2_worst_gene:]
-    else:
-        segment1 = parent2[1:parent_2_worst_gene]
-        segment2 = parent1[parent_2_worst_gene:parent_1_worst_gene]
-        segment3 = parent2[parent_1_worst_gene:]
+    # Récupérer les indices des gagnants
+    winners = winners_device.copy_to_host()
+    return winners
 
-    child = [0]
-    child_set = set(child)
+@cuda.jit
+def crossover_kernel(parents, children, parent_indices, n_cities):
+    idx = cuda.grid(1)
+    state = cuda.random.create_xoroshiro128p_states(cuda.gridsize(1), seed=42)
+    if idx < parent_indices.size // 2:
+        parent1_idx = parent_indices[2 * idx]
+        parent2_idx = parent_indices[2 * idx + 1]
 
-    for segment in [segment1, segment2, segment3]:
-        for gene in segment:
-            if gene not in child_set:
-                child.append(gene)
-                child_set.add(gene)
-                child_set.add(bilat_pairs_dict.get(gene, 0))   #if gene not in billat pair, we add 0 to the set 
+        # Sélection aléatoire de deux points pour le crossover d'ordre
+        point1 = int(cuda.random.xoroshiro128p_uniform_float32(state, idx) * n_cities)
+        point2 = int(cuda.random.xoroshiro128p_uniform_float32(state, idx) * n_cities)
+        
+        if point1 > point2:
+            point1, point2 = point2, point1
 
-    for parent in [parent1, parent2]:
-        for gene in parent:
-            if gene not in child_set:
-                child.append(gene)
-                child_set.add(gene)
-                child_set.add(bilat_pairs_dict.get(gene, 0))
-    return np.array(child)
+        # Initialiser le tableau d'enfant avec des valeurs invalides
+        for i in range(n_cities):
+            children[2 * idx][i] = -1
+            children[2 * idx + 1][i] = -1
 
-def mutation(individual, length=3):
-    """
-    Perform a mutation on an individual by segment rearrangement and potential scrambling within the segment.
+        # Copie de la section du parent 1 à l'enfant 1
+        for i in range(point1, point2 + 1):
+            children[2 * idx][i] = parents[parent1_idx][i]
 
-    Parameters:
-    individual (np.ndarray): The individual to mutate.
-    length (int): The length of the segment to extract and potentially scramble.
+        # Remplissage de l'enfant 1 avec les villes du parent 2 en partant de point2 + 1
+        fill_idx = (point2 + 1) % n_cities
+        for i in range(n_cities):
+            city = parents[parent2_idx][(point2 + 1 + i) % n_cities]
+            if city not in children[2 * idx]:
+                if fill_idx >= n_cities:
+                    fill_idx = 0
+                children[2 * idx][fill_idx] = city
+                fill_idx += 1
 
-    Returns:
-    np.ndarray: The mutated individual.
-    """
-    start = random.randint(1, len(individual) - 2 - length)
-    end = start + length
-    segment = individual[start:end].copy()
+def crossover_gpu(parents_device, n_individuals, n_cities):
+    # Allocation de l'espace pour les enfants sur le GPU
+    children_device = cuda.device_array((n_individuals, n_cities), dtype=np.int32)
 
-    if random.random() < SCRAMBLE_MUTATION_RATE:
-        subset = segment[1:-1].copy()
-        np.random.shuffle(subset)
-        segment[1:-1] = subset
+    # Générer des indices de parents aléatoires pour le croisement
+    parent_indices = np.random.permutation(n_individuals)
+    parent_indices_device = cuda.to_device(parent_indices)
 
-    if start - 1 != 0:
-        individual = swap_with_pair(individual, start - 1)
-    segment = swap_with_pair(segment,0)
-    segment = swap_with_pair(segment, len(segment) - 1)
-    individual = swap_with_pair(individual, end)
+    # Configuration du kernel
+    threads_per_block = 256
+    blocks_per_grid = (n_individuals // 2 + threads_per_block - 1) // threads_per_block
 
-    individual = np.concatenate((individual[:start], individual[end:]))
-    new_position = random.randint(1, len(individual) - 2)
-    if new_position - 1 != 0:
-        individual = swap_with_pair(individual, new_position - 1)
-    individual = swap_with_pair(individual, new_position)
-    if len(np.concatenate((individual[:new_position], segment, individual[new_position:]))) != 262:
-        print(f"Taille mutaiton {len(np.concatenate((individual[:new_position], segment, individual[new_position:])))}")
-        exit()
-    return np.concatenate((individual[:new_position], segment, individual[new_position:]))
+    # Appel du kernel
+    crossover_kernel[blocks_per_grid, threads_per_block](parents_device, children_device, parent_indices_device, n_cities)
+
+    # Retourne le tableau des enfants
+    return children_device
 
 
+@cuda.jit
+def mutation_kernel(individuals, mutation_rate, segment_length, n_cities):
+    idx = cuda.grid(1)
+    state = cuda.random.create_xoroshiro128p_states(cuda.gridsize(1), seed=42)
+    
+    if idx < individuals.shape[0] and cuda.random.xoroshiro128p_uniform_float32(state, idx) < mutation_rate:
+        # Sélectionner un point de départ aléatoire pour le segment
+        start = int(cuda.random.xoroshiro128p_uniform_float32(state, idx) * (n_cities - segment_length))
+        end = start + segment_length
+
+        # Extraire le segment et mélanger potentiellement
+        segment = cuda.local.array(20, dtype=int32)  # Assumer la longueur maximale de 20 pour le segment
+        for i in range(segment_length):
+            segment[i] = individuals[idx][start + i]
+
+        # Mélange simple du segment
+        for i in range(1, segment_length-1):  # Ne mélangez pas le premier et le dernier élément
+            j = int(cuda.random.xoroshiro128p_uniform_float32(state, idx) * (segment_length - 2)) + 1
+            temp = segment[i]
+            segment[i] = segment[j]
+            segment[j] = temp
+
+        # Réinsérer le segment à une nouvelle position
+        new_position = int(cuda.random.xoroshiro128p_uniform_float32(state, idx) * (n_cities - segment_length))
+        # Décaler le reste pour faire de la place au segment
+        if new_position < start:
+            for i in range(start - new_position):
+                individuals[idx][end - 1 - i] = individuals[idx][start - 1 - i]
+        elif new_position > start:
+            for i in range(end - start):
+                individuals[idx][new_position + i] = segment[i]
+
+def mutation_gpu(individuals_device, mutation_rate, segment_length, n_individuals, n_cities):
+    threads_per_block = 256
+    blocks_per_grid = (n_individuals + threads_per_block - 1) // threads_per_block
+
+    mutation_kernel[blocks_per_grid, threads_per_block](individuals_device, mutation_rate, segment_length, n_cities)
 
 def swap_with_pair(individual, index=-1):
     """
@@ -319,90 +350,138 @@ def swap_with_pair(individual, index=-1):
             individual[index] = bilat_pairs_dict[individual[index]]  # Swap
     return individual
 
-def create_new_child(population, population_variance, stuck_generations, is_heavily_mutated_part):
+def select_parents_on_gpu(fitnesses_device, population_size):
+    # Assuming a function exists to perform tournament selection on GPU and returns indices
+    tournament_size = 3  # Or any other logic you have for determining the size
+    return run_tournament_selection_on_gpu(fitnesses_device, population_size, tournament_size)
+
+def determine_mutation_length(stuck_generations):
+    if stuck_generations > 100:
+        return np.random.randint(10, 20)
+    elif stuck_generations > 50:
+        return np.random.randint(5, 10)
+    else:
+        return np.random.randint(1, 5)
+
+
+def create_new_child_gpu(population_device, fitnesses_device, population_size, n_cities, stuck_generations, mutation_rate):
     """
-    Create a new child by selecting parents and applying genetic operations such as crossover and mutation.
+    Create a new child by selecting parents and applying genetic operations such as crossover and mutation on GPU.
 
     Parameters:
-    population (np.ndarray): The current population of individuals.
-    population_variance (float): The variance in fitness of the current population.
+    population_device (DeviceNDArray): The current population of individuals on the GPU.
+    fitnesses_device (DeviceNDArray): The fitness scores of the current population on the GPU.
+    population_size (int): The size of the population.
+    n_cities (int): Number of cities in the TSP.
     stuck_generations (int): Number of generations without significant fitness improvements.
-    is_heavily_mutated_part (bool): Flag indicating if heavier mutations should be applied.
+    mutation_rate (float): The probability of mutation.
 
     Returns:
-    np.ndarray: A new child created from selected parents with applied genetic operations.
+    DeviceNDArray: The new child created from selected parents with applied genetic operations.
     """
 
-    parent1 = tournament_selection(population, population_variance)
-    parent2 = tournament_selection(population, population_variance)
-    child = crossover(parent1[2], parent2[2], parent1[1], parent2[1])
-    if stuck_generations > 100:
-        mutation_length = random.randint(10, 20)
-    elif stuck_generations > 50:
-        mutation_length = random.randint(5, 10)
-    else:
-        mutation_length = random.randint(1, 5)
-    if random.random() < MUTATION_RATE:
-        child = mutation(child, mutation_length)
+    # Select parents on GPU
+    parent_indices_device = select_parents_on_gpu(fitnesses_device, population_size)
 
-    return child
+    # Crossover to create a new child
+    children_device = crossover_gpu(population_device, parent_indices_device, n_cities)
 
+    # Determine mutation length based on the number of stuck generations
+    mutation_length = determine_mutation_length(stuck_generations)
 
-def genetic_algorithm(init_sol, population_size, best_scores, variances):
+    # Apply mutation on GPU
+    mutation_gpu(children_device, mutation_rate, mutation_length, population_size, n_cities)
+
+    return children_device
+
+def create_new_generation_gpu(population_device, fitnesses_device, population_size, n_cities, stuck_generations, mutation_rate):
     """
-    Execute a genetic algorithm to optimize a solution using a variety of genetic operations.
+    Generate a new population on the GPU by creating new children using genetic operations.
+    
+    Parameters:
+    population_device (DeviceNDArray): The current population stored on the GPU.
+    fitnesses_device (DeviceNDArray): The fitness values for the current population stored on the GPU.
+    population_size (int): The size of the population.
+    n_cities (int): The number of cities in the TSP problem.
+    stuck_generations (int): The number of generations without significant fitness improvements.
+    mutation_rate (float): The mutation rate to be used during mutation.
+    
+    Returns:
+    DeviceNDArray: The new population generated on the GPU.
+    """
+    # Allocate space for the new population on the GPU
+    new_population_device = cuda.device_array((population_size, n_cities), dtype=np.int32)
+
+    # Create a random generator states for each thread
+    rng_states = cuda.random.create_xoroshiro128p_states(population_size * n_cities, seed=42)
+
+    # Kernel dimensions
+    threads_per_block = 256
+    blocks_per_grid = (population_size + threads_per_block - 1) // threads_per_block
+
+    # Generate each new child on the GPU
+    for i in range(population_size):
+        create_new_child_gpu[blocks_per_grid, threads_per_block](
+            population_device, fitnesses_device, new_population_device, i, n_cities, stuck_generations, mutation_rate, rng_states
+        )
+
+    return new_population_device
+
+def genetic_algorithm_gpu(init_sol, population_size, best_scores, variances, n_cities):
+    """
+    Execute a genetic algorithm entirely on the GPU to optimize a TSP solution.
 
     Parameters:
     init_sol (np.ndarray): The initial solution used as the baseline for generating the initial population.
     population_size (int): The size of the population in each generation.
     best_scores (list): A list to record the best fitness score in each generation.
     variances (list): A list to record the variance of fitness scores within the population for each generation.
+    n_cities (int): The number of cities in the problem, required for array dimensions.
 
     Returns:
     np.ndarray: The best individual (solution) found across all generations based on fitness evaluations.
     """
-    population = initialize_population(init_sol, population_size)
+    # Initialize population on GPU
+    population_device = initialize_population_gpu(init_sol, population_size, n_cities)
+
+    # Allocate space for fitnesses on GPU
+    fitnesses_device = cuda.device_array(population_size, dtype=np.float32)
+
     start_time = time.time()
     generation = 0
     stuck_generations = 0
-    previous_score = 0
+    previous_score = float('inf')
 
-    while time.time() - start_time < 60:  # Run until 10 minutes
-        population = selection(population)
-        best_score = population[0][0]
+    while time.time() - start_time < 600:  # Run until 10 minutes
+        # Calculate fitnesses
+        fitness(population_device, fitnesses_device)
+
+        # Get the best score for recording and decision making
+        best_score = cuda.to_host(fitnesses_device).min()
         best_scores.append(best_score)
+
+        # Determine population variance
+        population_variance = calculateVariance(fitnesses_device)
+        variances.append(population_variance)
+
+        # Print progress
+        print(f"Generation {generation}: {best_score} with Variance: {population_variance}")
 
         if best_score == previous_score:
             stuck_generations += 1
         else:
             stuck_generations = 0
             previous_score = best_score
+
+        # Create new population
+        new_population_device = create_new_generation_gpu(population_device, fitnesses_device, population_size, n_cities, stuck_generations)
+
+        # Swap populations
+        population_device = new_population_device
         generation += 1
-        print(f"Generation {generation}: {best_score}", end=" ")
 
-        population_variance = calculateVariance(population)
-        print(f"Variance: {population_variance}")
-        variances.append(population_variance)
-
-        new_population = []
-        new_population.extend(individual[2] for individual in population[:population_size // 30])
-
-
-        while len(new_population) < population_size // 2:
-            child = create_new_child(population, population_variance, stuck_generations, False)
-            new_population.append(child)
-
-        while len(new_population) < population_size:
-            child = create_new_child(population, population_variance, stuck_generations, True)
-            new_population.append(child)
-
-        #for individual in new_population:
-        #    print(f"Taille des individuals {len(individual)}")
-
-        population = np.array([np.array(ind) for ind in new_population])  # Ensure all elements are Numpy arrays
-
-    return min(fitness(population), key=lambda x: x[0])[2]  # Return the best solution found
-
+    # Extract the best individual
+    return extract_best_individual_gpu(population_device, fitnesses_device)
 
 
 def calculateDandT(route):
