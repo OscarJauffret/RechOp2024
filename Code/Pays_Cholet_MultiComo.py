@@ -6,13 +6,21 @@ import os
 import time
 from matplotlib import pyplot as plt
 import math
+from utils import *
 
-# Define global constants for the genetic algorithm parameters and environment settings
+# Define the population size for the genetic algorithm
 POPULATION_SIZE = 1000
+
+# Define the weight limits for the two types of commodities
 WEIGHT_LIMIT_TYPE1 = 5850
 WEIGHT_LIMIT_TYPE2 = 5850
-BAD = 999999  # Penalty value for exceeding weight limits
+
+# Define the penalty value for exceeding the weight limits
+BAD = 999999 
+
+# Define the mutation rates for normal and scramble mutations
 MUTATION_RATE = 0.9
+SCRAMBLE_MUTATION_RATE = 0.2
 
 # Attempt to change the directory to where data files are stored, catching exceptions if the path doesn't exist
 try:
@@ -20,17 +28,12 @@ try:
 except FileNotFoundError:
     pass
 
-# Load initial solutions and related data structures from serialized pickle files
-with open("init_sol_Cholet_pb1_bis.pickle", "rb") as f:
-    init_solu = pickle.load(f)
-with open("dist_matrix_Cholet_pb1_bis.pickle", "rb") as f:
-    dist_matrix = pickle.load(f)
-with open("dur_matrix_Cholet_pb1_bis.pickle", "rb") as f:
-    dur_matrix = pickle.load(f)
-with open("temps_collecte_Cholet_pb1_bis.pickle", "rb") as f:
-    collection_time = pickle.load(f)
-with open("bonus_multi_commodity_Cholet_pb1_bis.pickle", "rb") as f:
-    weight_list = pickle.load(f)
+# Load necessary data from pickle files
+init_solu = load_data("init_sol_Cholet_pb1_bis.pickle")
+dist_matrix = load_data("dist_matrix_Cholet_pb1_bis.pickle")
+dur_matrix = load_data("dur_matrix_Cholet_pb1_bis.pickle")
+collection_time = load_data("temps_collecte_Cholet_pb1_bis.pickle")
+weight_list = load_data("bonus_multi_commodity_Cholet_pb1_bis.pickle")
 
 # Add the outlet node to the weight list with the maximum weight limits
 weight_list[-1] = [-WEIGHT_LIMIT_TYPE1, -WEIGHT_LIMIT_TYPE2]
@@ -48,22 +51,26 @@ def initialize_population(init_sol, population_size):
     Returns:
     list: A list of individuals representing the initial population.
     """
-    #print(f"Génération 0: Solution initiale: {fitness(init_sol)} {init_sol}")
     population = [init_sol.copy()]
     for _ in range(1, population_size):
         new_individual = mutation(init_sol.copy(), random.randint(1, 5))
         population.append(new_individual)
     return population
 
-def fitness(chemin):
+
+def fitness(chemin) -> tuple[float, int]:
     """
-    Calculate the fitness of a solution, combining total distance and penalties for excess weight.
+    Calculate the fitness of a solution.
+
+    The fitness is calculated as the total distance of the solution.
+    If the weight limits are exceeded, a penalty is added to the fitness. 
+    The function also finds the maximum distance between any two points in the solution and its index.
 
     Parameters:
-    chemin (list): A route or path represented as a list of node indices.
+    chemin (list): The solution to evaluate.
 
     Returns:
-    tuple: A tuple containing the total distance (float) and the index of the furthest node (int).
+    tuple: The fitness and the index of the maximum distance
     """
     total_distance = 0
     total_weight_type1 = 0
@@ -87,6 +94,7 @@ def fitness(chemin):
             penalty += BAD
     return total_distance + penalty, index_max_distance
 
+
 def selection(population, pool):
     """
     Select the top individuals from the population based on fitness.
@@ -102,18 +110,6 @@ def selection(population, pool):
     ranked_solutions = sorted(zip(fitness_values, population), key=lambda x: x[0], reverse=False)
     return ranked_solutions[:POPULATION_SIZE // 6]
 
-def calculateVariance(population):
-    """
-    Calculate the variance of fitness values within the population, used to adjust mutation parameters dynamically.
-
-    Parameters:
-    population (list): The current population whose fitness variance is to be calculated.
-
-    Returns:
-    float: The variance of the fitness values within the population.
-    """
-    mean = sum(sol[0][0] for sol in population) / len(population)
-    return sum((sol[0][0] - mean) ** 2 for sol in population) / len(population)
 
 def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.0005, max_base=1.01):
     """
@@ -131,13 +127,13 @@ def linear_base(variance, min_variance=100000, max_variance=1000000, min_base=0.
     """
 
     if variance <= min_variance:
-        return min_base     # small base to promote exploration 
+        return min_base 
     elif variance >= max_variance:
-        return max_base     # Tall base to promote exploitation. (Give higher weight to best solutions)
+        return max_base
     else:
         return max_base + (min_base - max_base) * ((variance - min_variance) / (max_variance - min_variance))
 
-# Tournament selection based on calculated weights
+
 def tournament_selection(population, variance, tournament_size=10):
     """
     Perform tournament selection from the population based on fitness calculated weights.
@@ -156,7 +152,7 @@ def tournament_selection(population, variance, tournament_size=10):
     weights = [math.exp(-base * i) for i in range(n)]
     return min(random.choices(population, weights=weights, k=tournament_size))
 
-# Cut On Worst L+R Crossover
+
 def crossover(parent1: list[int], parent2: list[int], parent_1_worst_gene: int, parent_2_worst_gene:  int) -> list[int]:
     """
     Combine genes from two parents to create a new individual, focusing on cutting at the worst performing genes.
@@ -169,7 +165,6 @@ def crossover(parent1: list[int], parent2: list[int], parent_1_worst_gene: int, 
     list: A new individual created by combining segments from both parents.
     """
     
-    # Define segments by cutting parents on their worst genes
     if parent_1_worst_gene < parent_2_worst_gene:
         segment1 = parent1[1:parent_1_worst_gene]
         segment2 = parent2[parent_1_worst_gene:parent_2_worst_gene]
@@ -179,18 +174,15 @@ def crossover(parent1: list[int], parent2: list[int], parent_1_worst_gene: int, 
         segment2 = parent1[parent_2_worst_gene:parent_1_worst_gene]
         segment3 = parent2[parent_1_worst_gene:]
 
-    # Initialize the child with the first common element
     child = [0]
     child_set = set(child)
 
-    # Add segments to the child while avoiding duplicates
     for segment in [segment1, segment2, segment3]:
         for gene in segment:
             if gene not in child_set:
                 child.append(gene)
                 child_set.add(gene)
 
-    # Add remaining elements from parents to complete the child
     for parent in [parent1, parent2]:
         for gene in parent:
             if gene not in child_set:
@@ -198,199 +190,168 @@ def crossover(parent1: list[int], parent2: list[int], parent_1_worst_gene: int, 
                 child_set.add(gene)
     return child
 
+
 def mutation(individual, length=3):
     """
-    Perform segment mutation on an individual by randomly relocating a segment.
+    Perform a mutation on an individual by segment rearrangement and potential scrambling within the segment.
+
+    This function selects a segment of the individual based on the given length, optionally scrambles the contents of
+    the segment, and then reinserts the (possibly scrambled) segment at a new position within the individual. This mutation
+    is designed to explore new genetic configurations by altering the sequence of genes.
 
     Parameters:
-    individual (list): The individual to mutate.
-    length (int): The length of the segment to mutate.
+    individual (list): The individual to mutate, represented as a list of gene indices.
+    length (int): The length of the segment to extract and potentially scramble.
 
     Returns:
-    list: The mutated individual with a segment randomly relocated.
+    list: The mutated individual with the segment rearranged.
     """
-    # Select the starting position of the segment to mutate, ensuring it does not affect the first or last gene
+
     start = random.randint(1, len(individual) - 2 - length)
     end = start + length
-    segment = individual[start:end]  # Extract the segment to be relocated
-    del individual[start:end]  # Remove the segment from its original location
-    new_position = random.randint(1, len(individual) - 2)  # Select a new position for the segment
-    individual = individual[:new_position] + segment + individual[new_position:]  # Reinsert the segment
+    segment = individual[start:end] 
+
+    if random.random() < SCRAMBLE_MUTATION_RATE:
+        subset = segment[1:-1]  
+        random.shuffle(subset)  
+        segment[1:-1] = subset 
+
+    del individual[start:end]
+
+    new_position = random.randint(1, len(individual) - 2)
+
+    individual = individual[:new_position] + segment + individual[new_position:]
     return individual
 
-def swap_mutation(individual):
+
+def create_new_child(population, variance, stuck_generations, is_heavily_mutated_part):
     """
-    Introduce variability by swapping two randomly selected genes within an individual.
+    Create a new child by combining segments from two parents and mutating the child.
 
     Parameters:
-    individual (list): The individual to mutate.
+    population (list): The current population from which to select parents.
+    variance (float): The variance of the population's fitness values.
+    stuck_generations (int): The number of generations with no improvement.
 
     Returns:
-    list: The mutated individual with two genes swapped.
+    list: A new child individual created by crossover and mutation.
     """
-    # Select two random indices for swapping
-    i, j = random.sample(range(1, len(individual) - 1), 2)
-    # Swap the genes at the selected indices
-    individual[i], individual[j] = individual[j], individual[i]
-    return individual
+
+    parent1 = tournament_selection(population, variance)
+    parent2 = tournament_selection(population, variance)
+    child = crossover(parent1[1], parent2[1], parent1[0][1], parent2[0][1])
+    if not is_heavily_mutated_part:
+        mutation_length = random.randint(2, 6) if stuck_generations > 10 else random.randint(1, 3)
+    else:
+        mutation_length = random.randint(6, 18) if stuck_generations > 10 else random.randint(3, 9)
+
+    if random.random() < MUTATION_RATE:
+        child = mutation(child, mutation_length)
+
+    return child
+
 
 def genetic_algorithm(init_sol, population_size, best_scores):
     """
-    Optimize the solution using a genetic algorithm framework with selection, crossover, and mutation operations.
+    Perform the genetic algorithm
+
+    The genetic algorithm creates a population of solutions and evolves it over a number of generations.
+    The algorithm uses selection, crossover, and mutation to create new solutions.
 
     Parameters:
-    init_sol (list): The initial solution or seed for the population.
-    population_size (int): The size of the population to maintain.
-    best_scores (list): A list to record the best scores achieved during the optimization.
+    init_sol (list): The initial solution.
+    population_size (int): The size of the population.
+    best_scores (list): A list to store the best scores of each generation.
 
     Returns:
-    list: The best solution found during the genetic algorithm execution.
+    list: The best solution found by the genetic algorithm.
     """
 
-    population = initialize_population(init_sol, population_size)   # Initialize the population
+    population = initialize_population(init_sol, population_size) 
     start_time = time.time()
     generation = 0
     stuck_generations = 0
     previous_score = 0
 
-    with multiprocessing.Pool() as pool:    # Use multiprocessing to handle parallel computation of fitness evaluations
-        while time.time() - start_time < 600:   # Run until 10 minutes
+    with multiprocessing.Pool() as pool:
+        while time.time() - start_time < 600:
             
             population = selection(population, pool)
+
             best_score = population[0][0][0]
             best_scores.append(best_score)
 
-             # Check if the best score has changed from the previous generation
             if best_score == previous_score:
                 stuck_generations += 1
             else:
                 stuck_generations = 0
                 previous_score = best_score
+
             generation += 1
-            #print(f"Generation {generation}: {best_score}", end=" ")
+            print(f"Generation {generation}: {best_score}", end=" ")
             
-            # Calculate the variance of fitness scores in the population for dynamic adaptations
-            population_variance = calculateVariance(population) 
-            #print(f"Variance: {population_variance}")
-            variances.append(population_variance)
-            
-            # Create a new population starting with the best performing individuals
+            population_variance = calculate_variance(population) 
+            print(f"Variance: {population_variance}")
+
             new_population = []
-            new_population.extend(individual[1] for individual in population[:population_size // 50])   #1000/50 = 20 best individuals
+            new_population.extend(individual[1] for individual in population[:population_size // 50])
             
-            # Fill a part of the new population with offspring from selected parents
-            while len(new_population) < population_size // 2:   #1000/2 = 500 child form best parents choose with tournament selection
-                # Perform tournament selection based on current population variance
-                parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population, population_variance)
-                child = crossover(parent1[1], parent2[1], parent1[0][1], parent2[0][1]) # Create a child through crossover
-                
-                # Determine mutation strength based on the number of stagnant generations
-                mutation_length = random.randint(2, 6) if stuck_generations > 10 else random.randint(1, 3)
-                if random.random() < MUTATION_RATE:
-                    child = mutation(child, mutation_length)    # Mutate the child
-                new_population.append(child)    # Add the new child to the population
+            while len(new_population) < population_size // 2: 
+                child = create_new_child(population, population_variance, stuck_generations, False)
+                new_population.append(child)
 
-            # Continue populating until the desired population size is reached
             while len(new_population) < population_size:
-                # Perform tournament selection based on current population variance
-                parent1, parent2 = tournament_selection(population, population_variance), tournament_selection(population, population_variance)
-                child = crossover(parent1[1], parent2[1], parent1[0][1], parent2[0][1]) # Create a child through crossover
-                
-                # Determine mutation strength based on the number of stagnant generations
-                mutation_length = random.randint(6, 18) if stuck_generations > 10 else random.randint(3, 9)
-                if random.random() < MUTATION_RATE:
-                    child = mutation(child, mutation_length)    # Mutate the child
-                new_population.append(child)    # Add the new child to the population
+                child = create_new_child(population, population_variance, stuck_generations, True)
+                new_population.append(child)
 
-            population = new_population     # Replace the old population with the new one
+            population = new_population
 
     return min(population, key=fitness)
 
-def calculateDandT(l):
-    """
-    Calculate the total distance and time for a given route.
-
-    Parameters:
-    l (list): A route represented as a list of node indices.
-
-    Returns:
-    tuple: Total distance and time for the route.
-    """
-
-    distance = 0
-    time = 0
-    for i in range(len(l)):
-        if i != len(l) - 1:
-            distance += dist_matrix[l[i]][l[i + 1]]
-            time += dur_matrix[l[i]][l[i + 1]]
-        time += collection_time[l[i]]
-    return distance, time
-
-def has_duplicates(lst):
-    """
-    Check if a list contains duplicate elements.
-
-    Parameters:
-    lst (list): The list to check for duplicates.
-
-    Returns:
-    bool: True if there are duplicates, otherwise False.
-    """
-
-    return len(lst) != len(set(lst))
-
-
-def ispermutation(l):
-    """
-    Verify if a list is a valid permutation of the expected node indices.
-
-    Parameters:
-    l (list): The list representing a route.
-
-    Returns:
-    bool: True if the list is a permutation of the range from 0 to the last index in the initial solution, otherwise False.
-    """
-
-    return sorted(l) == list(range(233)) and l[0] == 0 and l[-1] == 232
-
-
-#if __name__ == "__main__":
-#    best_scores = []
-#    variances = []
-#    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
-#
-#    generation = [i for i in range(len(best_scores))]
-#    fitness = [s[0] for s in best_scores]
-#
-#    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)[0]} avec le chemin : {min(best_scores)[1]}")
-#    #print(f"{min(best_scores)[0]};{min(best_scores)[1]}")
-#    print(best_solution)
-#    distance, temps = calculateDandT(best_solution)
-#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-#    print(f"Fitness: {distance + temps}")
-#    print(has_duplicates(best_solution))
-#    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
-#    distance, temps = calculateDandT(init_solu)
-#    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
-#    print(f"fitness sol initiale : {distance + temps}")
-#
-#    # Plot a graph to see the evolution 
-#    plt.scatter(generation, fitness)
-#    plt.show()
-
 if __name__ == "__main__":
+    # Initialize the best scores list to store the results
     best_scores = []
-    variances = []
 
+    # Run the genetic algorithm to optimize the solution
     best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
 
+    # Create lists for the generation numbers and fitness values
+    generation = [i for i in range(len(best_scores))]
+    fitness = [s[0] for s in best_scores]
+
+    # Print the best solution and its fitness
+    print(best_solution)
+
+    # Calculate and print the distance and time for the best solution
+    distance, temps = calculate_D_and_T(best_solution, dist_matrix, dur_matrix, collection_time)
+    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+
+    # Print the fitness of the best solution
+    print(f"Fitness: {distance + temps}")
+
+    # Check if the best solution has duplicates and is a valid permutation
+    print(f"Est-ce que la solution possède des doublons ? {has_duplicates(best_solution)}")
+    print(f"Est-ce une bonne solution ? {is_permutation(best_solution, init_solu)}")
+
+    # Calculate the distance and time for the initial solution
+    distance, temps = calculate_D_and_T(init_solu, dist_matrix, dur_matrix, collection_time)
+    print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
+
+    # Print the fitness of the initial solution
+    print(f"fitness sol initiale : {distance + temps}")
+    
+    # Save the results to a pickle file
     result = {
         "best_score": min(best_scores),
         "best_solution": best_solution,
-        "distance_time": calculateDandT(best_solution),
+        "distance_time": calculate_D_and_T(best_solution),
         "generation_best_scores": best_scores,
     }
 
     os.chdir("../../Code")
     with open("resultCholet_MultiComo.pkl", "wb") as f:
         pickle.dump(result, f)
+
+    # Plot the fitness values over the generations
+    plt.scatter(generation, fitness)
+    plt.show()
