@@ -202,21 +202,6 @@ def mutation(individual, length=3):
     individual = individual[:new_position] + segment + individual[new_position:]  # Reinsert the segment
     return individual
 
-def swap_mutation(individual):
-    """
-    Introduce variability by swapping two randomly selected genes within an individual.
-
-    Parameters:
-    individual (list): The individual to mutate.
-
-    Returns:
-    list: The mutated individual with two genes swapped.
-    """
-    # Select two random indices for swapping
-    i, j = random.sample(range(1, len(individual) - 1), 2)
-    # Swap the genes at the selected indices
-    individual[i], individual[j] = individual[j], individual[i]
-    return individual
 
 def genetic_algorithm(init_sol, population_size, best_scores):
     """

@@ -284,24 +284,6 @@ def create_new_child(population, population_variance, stuck_generations):
 
     return child
 
-def swap_mutation(individual):
-    """
-    Perform a swap mutation by exchanging two randomly selected genes in an individual.
-
-    This function introduces genetic diversity by randomly selecting two genes within an individual and swapping their positions,
-    which can lead to new traits in offspring.
-
-    Parameters:
-    individual (list): The individual on which to perform the swap mutation.
-
-    Returns:
-    list: The individual after the genes have been swapped.
-    """
-    
-    first_index = random.randint(1, len(individual) - 2)
-    second_index = random.randint(1, len(individual) - 2)
-    individual[first_index], individual[second_index] = individual[second_index], individual[first_index]
-    return individual
 
 def genetic_algorithm(init_sol, population_size, best_scores):
     """
@@ -330,7 +312,7 @@ def genetic_algorithm(init_sol, population_size, best_scores):
     with multiprocessing.Pool() as pool:     # Use multiprocessing to handle parallel computation of fitness evaluations
         while time.time() - start_time < 600:    # Run until 10 minutes
             
-            population = selection(population, pool, stuck_generations)
+            population = selection(population, pool)
             # print(f"Genetic diversity: {genetic_diversity(population)}")
             best_score = population[0][0][0]
             best_scores.append(best_score)
@@ -354,12 +336,12 @@ def genetic_algorithm(init_sol, population_size, best_scores):
             
             # Fill a part of the new population with offspring from selected parents
             while len(new_population) < population_size // 2:   #1000/2 = 500 child form best parents choose with tournament selection
-                child = create_new_child(population, population_variance, stuck_generations, False)
+                child = create_new_child(population, population_variance, stuck_generations)
                 new_population.append(child)
 
             # Continue populating until the desired population size is reached
             while len(new_population) < population_size:
-                child = create_new_child(population, population_variance, stuck_generations, True)
+                child = create_new_child(population, population_variance, stuck_generations)
                 new_population.append(child)
 
             population = new_population # Replace the old population with the new one
