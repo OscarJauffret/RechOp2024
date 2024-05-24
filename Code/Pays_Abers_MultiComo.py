@@ -358,7 +358,7 @@ def genetic_algorithm(init_sol, population_size, best_scores):
     with multiprocessing.Pool() as pool:
         while time.time() - start_time < 600:
             
-            population = selection(population, pool, stuck_generations)
+            population = selection(population, pool)
 
             best_score = population[0][0][0]
             best_scores.append(best_score)
