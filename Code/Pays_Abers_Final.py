@@ -6,6 +6,7 @@ import os
 import time
 import math
 import matplotlib.pyplot as plt
+from utils import *
 
 # Define global constants used throughout the code
 ACCELERATED_MUTATION_THRESHOLD = 1000
@@ -26,19 +27,14 @@ except FileNotFoundError:
     pass
 
 # Load necessary data from pickle files
-with open("init_sol_Abers_pb2.pickle", "rb") as f:
-    init_solu = pickle.load(f)
-with open("dist_matrix_Abers_pb2.pickle", "rb") as f:
-    dist_matrix = pickle.load(f)
-with open("weight_Abers_pb2.pickle", "rb") as f:
-    weight_list = pickle.load(f)
-with open("dur_matrix_Abers_pb2.pickle", "rb") as f:
-    dur_matrix = pickle.load(f)
-with open("temps_collecte_Abers_pb2.pickle", "rb") as f:
-    collection_time = pickle.load(f)
-with open("bilat_pairs_Abers_pb2.pickle", "rb") as f:
-    bilat_pairs = pickle.load(f)
+init_solu = load_data("init_sol_Abers_pb2.pickle")
+dist_matrix = load_data("dist_matrix_Abers_pb2.pickle")
+weight_list = load_data("weight_Abers_pb2.pickle")
+dur_matrix = load_data("dur_matrix_Abers_pb2.pickle")
+collection_time = load_data("temps_collecte_Abers_pb2.pickle")
+bilat_pairs = load_data("bilat_pairs_Abers_pb2.pickle")
 
+bilat_pairs_dict = create_dict(bilat_pairs)
 
 def initialize_population(init_sol, population_size):
     """
@@ -87,33 +83,6 @@ def fitness(chemin) -> tuple[float, int]:
     return total_distance, index_max_distance
 
 
-def create_dict(pairs):
-    """
-    Create a dictionary from a list of bilateral pairs for quick look-up.
-
-    This function constructs a dictionary where each item is key-value pair representing
-    bilateral links. Each pair in the list has two elements, and the function ensures that
-    both elements can be used interchangeably as keys to retrieve the other element. This is
-    useful for situations where you need to quickly find the corresponding pair of an element.
-
-    Parameters:
-    pairs (list of tuple): A list of tuples, where each tuple contains two elements that are bilateral.
-
-    Returns:
-    dict: A dictionary where each key is an element from the pairs, and its value is its bilateral counterpart.
-    """
-
-    pair_dict = {}
-    for pair in pairs:
-        # Map each element of the pair to the other
-        pair_dict[pair[0]] = pair[1]
-        pair_dict[pair[1]] = pair[0]
-    return pair_dict
-
-
-
-bilat_pairs_dict = create_dict(bilat_pairs)
-
 
 def selection(population, pool):
     """
@@ -131,19 +100,6 @@ def selection(population, pool):
     ranked_solutions = sorted(zip(fitness_values, population), reverse=False)
     return ranked_solutions[:POPULATION_SIZE // 5]
 
-def calculateVariance(population):
-    """
-    Calculate the variance of fitness values within the population, used to adjust mutation parameters dynamically.
-
-    Parameters:
-    population (list): The current population whose fitness variance is to be calculated.
-
-    Returns:
-    float: The variance of the fitness values within the population.
-    """
-
-    mean = sum(sol[0][0] for sol in population) / len(population)
-    return sum((sol[0][0] - mean) ** 2 for sol in population) / len(population)
 
 def linear_base(variance, min_variance=100000, max_variance=250000, min_base=0.0005, max_base=1.01):
     """
@@ -347,7 +303,7 @@ def swap_mutation(individual):
     individual[first_index], individual[second_index] = individual[second_index], individual[first_index]
     return individual
 
-def genetic_algorithm(init_sol, population_size, best_scores, variances):
+def genetic_algorithm(init_sol, population_size, best_scores):
     """
     Execute a genetic algorithm to optimize a solution using a variety of genetic operations.
 
@@ -386,12 +342,11 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
                 stuck_generations = 0
                 previous_score = best_score
             generation += 1
-            #print(f"Generation {generation}: {best_score}", end=" ")
+            print(f"Generation {generation}: {best_score}", end=" ")
             
             # Calculate the variance of fitness scores in the population for dynamic adaptations
-            population_variance = calculateVariance(population)
-            #print(f"Variance: {population_variance}")
-            variances.append(population_variance)
+            population_variance = calculate_variance(population)
+            print(f"Variance: {population_variance}")
 
             # Create a new population starting with the best performing individuals
             new_population = []
@@ -411,90 +366,25 @@ def genetic_algorithm(init_sol, population_size, best_scores, variances):
 
     return min(population, key=fitness)
 
-def calculateDandT(l):
-    """
-    Calculate the total distance and time for a given route.
-
-    Parameters:
-    l (list): A route represented as a list of node indices.
-
-    Returns:
-    tuple: Total distance and time for the route.
-    """
-        
-    distance = 0
-    time = 0
-    for i in range(len(l)):
-        if i != len(l) - 1:
-            distance += dist_matrix[l[i]][l[i + 1]]
-            time += dur_matrix[l[i]][l[i + 1]]
-        time += collection_time[l[i]]
-    return distance, time
-
-def has_duplicates(lst):
-    """
-    Check if a list contains duplicate elements.
-
-    Parameters:
-    lst (list): The list to check for duplicates.
-
-    Returns:
-    bool: True if there are duplicates, otherwise False.
-    """
-
-    return len(lst) != len(set(lst))
-
-def ispermutation(l):
-    """
-    Verify if a list is a valid permutation of the expected node indices.
-
-    Parameters:
-    l (list): The list representing a route.
-
-    Returns:
-    bool: True if the list is a permutation of the range from 0 to the last index in the initial solution, otherwise False.
-    """
-
-    return l[0] == 0 and l[-1] == init_solu[-1]
 
 
 if __name__ == "__main__":
     best_scores = []
-    variances = []
-    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
+    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores)
 
     generation = [i for i in range(len(best_scores))]
     fitness = [s for s in best_scores]
 
-    print(f"La meilleure solutions jamais obtenue est : {min(best_scores)}")
-
     print(best_solution)
-    distance, temps = calculateDandT(best_solution)
+    distance, temps = calculate_D_and_T(best_solution, dist_matrix, dur_matrix, collection_time)
     print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
     print(f"Fitness: {distance + temps}")
     print(has_duplicates(best_solution))
-    print(f"Est-ce une bonne solution ? {ispermutation(best_solution)}")
+    print(f"Est-ce une bonne solution ? {is_permutation(best_solution, init_solu)}")
 
-    distance, temps = calculateDandT(init_solu)
+    distance, temps = calculate_D_and_T(init_solu, dist_matrix, dur_matrix, collection_time)
     print(f"Distance: {distance / 1000} km, Temps: {temps / 3600} h")
     print(f"fitness sol initiale : {distance + temps}")
 
     plt.scatter(generation, fitness)
     plt.show()
-
-#if __name__ == "__main__":
-#    best_scores = []
-#    variances = []
-#
-#    best_solution = genetic_algorithm(init_solu, POPULATION_SIZE, best_scores, variances)
-#
-#    result = {
-#        "best_score": min(best_scores),
-#        "best_solution": best_solution,
-#        "distance_time": calculateDandT(best_solution),
-#        "generation_best_scores": best_scores,
-#    }
-#
-#    os.chdir("../../Code")
-#    with open("resultAbers.pkl", "wb") as f:
-#        pickle.dump(result, f)
